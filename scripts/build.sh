@@ -3,5 +3,6 @@
 set -e
 cd "$(dirname "$0")/.."
 rm -rf dist && mkdir dist
+mkdir -p node_modules  # gives npx wrangler a writable local cache dir (gitignored)
 cp index.html styles.css app.js time.js sw.js favicon.svg manifest.webmanifest _headers dist/
 echo "dist/ ready: $(ls dist | tr '\n' ' ')"
