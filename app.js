@@ -31,54 +31,77 @@ function saveLoc(v) {
   renderLocUI();
 }
 
-/* ---------- build Ten dial ---------- */
-const dial = $('dial');
-el('circle', { class: 'd-face', r: 196 }, dial);
+/* ---------- dial builders ---------- */
 const R_BAND = 172;
-el('circle', { class: 'd-night', r: R_BAND }, dial);
-const dayArc = el('path', { class: 'd-day', d: '' }, dial);
-for (let i = 0; i < 100; i++) {
-  const hour = i % 10 === 0, mid = i % 10 === 5;
-  const [x1, y1] = polar(hour ? 150 : mid ? 154 : 157, i / 100);
-  const [x2, y2] = polar(162, i / 100);
-  el('line', { class: `d-tick${hour ? ' hour' : mid ? ' mid' : ''}`, x1, y1, x2, y2 }, dial);
-}
-for (let h = 0; h < 10; h++) {
-  const [x, y] = polar(128, h / 10);
-  const t = el('text', { class: `d-num${h === 0 ? ' zero' : ''}`, x, y }, dial);
-  t.textContent = h;
-}
-{
-  const a = el('text', { class: 'd-zero-label', x: 0, y: -94 }, dial); a.textContent = 'Sunset · new day';
-}
-for (const [pos, label] of [[2.5, '12 AM'], [5, '6 AM'], [7.5, 'Noon']]) {
-  const [dx, dy] = polar(140, pos / 10); el('circle', { class: 'd-markdot', cx: dx, cy: dy, r: 2.2 }, dial);
-  const [x, y] = polar(102, pos / 10);
-  const t = el('text', { class: 'd-mark', x, y }, dial); t.textContent = label;
-}
-const sunRise = el('circle', { class: 'd-sun', r: 7, cx: 0, cy: -R_BAND }, dial);
-const sunSet = el('circle', { class: 'd-sun set', r: 7, cx: 0, cy: -R_BAND }, dial);
-const hand = (cls, len, tail) => el('line', { class: `hand ${cls}`, x1: 0, y1: tail, x2: 0, y2: -len }, dial);
-const hH = hand('h', 78, 14), hM = hand('m', 118, 18), hS = hand('s', 150, 26);
-el('circle', { class: 'hub', r: 6 }, dial);
-
-/* ---------- build analogue 12h clock ---------- */
-const analog = $('analog');
-el('circle', { class: 'a-face', r: 96 }, analog);
-for (let i = 0; i < 60; i++) {
-  const hr = i % 5 === 0;
-  const [x1, y1] = polar(hr ? 80 : 85, i / 60), [x2, y2] = polar(90, i / 60);
-  el('line', { class: `a-tick${hr ? ' hour' : ''}`, x1, y1, x2, y2 }, analog);
-}
-for (let h = 1; h <= 12; h++) {
-  const [x, y] = polar(67, h / 12);
-  el('text', { class: 'a-num', x, y }, analog).textContent = h;
-}
-const ahand = (cls, len) => el('line', { class: `hand ${cls}`, x1: 0, y1: 8, x2: 0, y2: -len }, analog);
-const aH = ahand('ah', 46), aM = ahand('am', 70), aS = ahand('as', 80);
-el('circle', { class: 'hub', r: 3.5 }, analog);
-
 const rot = (node, deg) => node.setAttribute('transform', `rotate(${deg.toFixed(3)})`);
+
+/** Ten 10-hour dial. Returns handles for hands and sun shading. */
+function buildTenDial(svg, { labels = true } = {}) {
+  el('circle', { class: 'd-face', r: 196 }, svg);
+  el('circle', { class: 'd-night', r: R_BAND }, svg);
+  const dayArc = el('path', { class: 'd-day', d: '' }, svg);
+  for (let i = 0; i < 100; i++) {
+    const hour = i % 10 === 0, mid = i % 10 === 5;
+    const [x1, y1] = polar(hour ? 150 : mid ? 154 : 157, i / 100);
+    const [x2, y2] = polar(162, i / 100);
+    el('line', { class: `d-tick${hour ? ' hour' : mid ? ' mid' : ''}`, x1, y1, x2, y2 }, svg);
+  }
+  for (let h = 0; h < 10; h++) {
+    const [x, y] = polar(128, h / 10);
+    el('text', { class: `d-num${h === 0 ? ' zero' : ''}`, x, y }, svg).textContent = h;
+  }
+  if (labels) el('text', { class: 'd-zero-label', x: 0, y: -94 }, svg).textContent = 'Sunset · new day';
+  for (const [pos, label] of [[2.5, '12 AM'], [5, '6 AM'], [7.5, 'Noon']]) {
+    const [dx, dy] = polar(140, pos / 10); el('circle', { class: 'd-markdot', cx: dx, cy: dy, r: 2.2 }, svg);
+    if (labels) { const [x, y] = polar(102, pos / 10); el('text', { class: 'd-mark', x, y }, svg).textContent = label; }
+  }
+  const rise = el('circle', { class: 'd-sun', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
+  const setS = el('circle', { class: 'd-sun set', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
+  const hand = (cls, len, tail) => el('line', { class: `hand ${cls}`, x1: 0, y1: tail, x2: 0, y2: -len }, svg);
+  const h = hand('h', 78, 14), m = hand('m', 118, 18), s = hand('s', 150, 26);
+  el('circle', { class: 'hub', r: 6 }, svg);
+  return { dayArc, rise, set: setS, R: R_BAND,
+    setHands(total) { rot(h, (total / 100000) * 360); rot(m, ((total % 10000) / 10000) * 360); rot(s, ((total % 100) / 100) * 360); } };
+}
+
+/** 24-hour analogue dial: noon at top, midnight at bottom (like a sun dial). */
+const R24 = 86;
+const turns24 = (sec) => T.mod(sec / 86400 - 0.5, 1); // 12:00 -> 0 turns (top)
+function build24Dial(svg) {
+  el('circle', { class: 'a-face', r: 99 }, svg);
+  el('circle', { class: 'a-night', r: R24 }, svg);
+  const dayArc = el('path', { class: 'a-day', d: '' }, svg);
+  for (let i = 0; i < 96; i++) { // quarter hours
+    const hr = i % 4 === 0;
+    const [x1, y1] = polar(hr ? 75 : 78, i / 96), [x2, y2] = polar(81, i / 96);
+    el('line', { class: `a-tick${hr ? ' hour' : ''}`, x1, y1, x2, y2 }, svg);
+  }
+  for (let h = 0; h < 24; h++) {
+    const [x, y] = polar(64, turns24(h * 3600));
+    el('text', { class: `a-num${h % 6 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y }, svg).textContent = h;
+  }
+  const rise = el('circle', { class: 'd-sun', r: 4.5, cx: 0, cy: -R24 }, svg);
+  const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
+  const hand = (cls, len) => el('line', { class: `hand ${cls}`, x1: 0, y1: 8, x2: 0, y2: -len }, svg);
+  const h = hand('ah', 44), m = hand('am', 70), s = hand('as', 80);
+  el('circle', { class: 'hub', r: 3.5 }, svg);
+  return { dayArc, rise, set: setS, R: R24,
+    setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); } };
+}
+
+/** Shade a dial's day arc and place sun markers; a, b in turns (0 = top, clockwise). */
+function shade(d, a, b) {
+  if (a == null) { d.dayArc.setAttribute('d', ''); d.rise.setAttribute('visibility', 'hidden'); d.set.setAttribute('visibility', 'hidden'); return; }
+  const span = T.mod(b - a, 1);
+  const [x1, y1] = polar(d.R, a), [x2, y2] = polar(d.R, b);
+  d.dayArc.setAttribute('d', `M${x1.toFixed(2)} ${y1.toFixed(2)} A${d.R} ${d.R} 0 ${span > 0.5 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`);
+  d.rise.setAttribute('cx', x1.toFixed(2)); d.rise.setAttribute('cy', y1.toFixed(2)); d.rise.removeAttribute('visibility');
+  d.set.setAttribute('cx', x2.toFixed(2)); d.set.setAttribute('cy', y2.toFixed(2)); d.set.removeAttribute('visibility');
+}
+
+const mainDial = buildTenDial($('dial'));
+const tradDial = build24Dial($('analog'));
+const exactDial = buildTenDial($('exact-dial'), { labels: false });
 
 /* ---------- formatting ---------- */
 const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
@@ -87,40 +110,54 @@ const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'nu
 const fmtYMD = ({ y, m, d }) => dateFmt.format(new Date(Date.UTC(y, m - 1, d)));
 const civilDateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 const t12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+const t12s = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+const t24 = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const tenHM = (total) => { const { h, m } = T.splitTen(total); return `${h}:${pad(m)}`; };
 function dur(sec) {
   const s = Math.round(Math.abs(sec)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
   return (h ? `${h}h ` : '') + `${m}m ${r}s`;
 }
 
-/* ---------- sun shading (recomputed when the Ten date or location changes) ---------- */
+/* ---------- sun shading (recomputed when the date or location changes) ---------- */
 let sunKey = '';
-function updateSun(now, tenDate) {
-  const lat = loc && Number.isFinite(loc.lat) ? loc.lat : 40;
-  const lon = loc ? loc.lon : T.zoneCentreLongitude(now);
+const sunPlace = (now) => {
   const approx = !(loc && Number.isFinite(loc.lat));
-  const key = `${tenDate.y}-${tenDate.m}-${tenDate.d}|${lat}|${lon}`;
+  return { lat: approx ? 40 : loc.lat, lon: loc ? loc.lon : T.zoneCentreLongitude(now), approx };
+};
+function updateSun(now, tenDate) {
+  const p = sunPlace(now);
+  const ed = T.exactTenDate(now, p.lon);
+  const key = `${tenDate.y}-${tenDate.m}-${tenDate.d}|${ed.y}-${ed.m}-${ed.d}|${p.lat}|${p.lon}`;
   if (key === sunKey) return;
   sunKey = key;
-  const s = T.sunTimes(tenDate.y, tenDate.m, tenDate.d, lat, lon);
+  const s = T.sunTimes(tenDate.y, tenDate.m, tenDate.d, p.lat, p.lon);
+  const se = T.sunTimes(ed.y, ed.m, ed.d, p.lat, p.lon);
+  const note = p.approx
+    ? `Approximate: estimated for your time zone (lat 40°, lon ${p.lon.toFixed(1)}°). Set your location for real sunrise and sunset.`
+    : `Real sunrise and sunset at ${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° (NOAA algorithm).`;
   if (!s.sunrise || !s.sunset) {
-    dayArc.setAttribute('d', '');
-    sunRise.setAttribute('visibility', 'hidden'); sunSet.setAttribute('visibility', 'hidden');
+    [mainDial, tradDial].forEach((d) => shade(d, null));
     $('sunrise').textContent = '—'; $('sunset').textContent = '—';
     $('sun-note').textContent = s.polar === 'day' ? 'Polar day: the sun does not set today.' : 'Polar night: the sun does not rise today.';
-    return;
+  } else {
+    shade(mainDial, T.sharedTen(s.sunrise) / 100000, T.sharedTen(s.sunset) / 100000);
+    shade(tradDial, turns24(T.localSecondsOfDay(s.sunrise)), turns24(T.localSecondsOfDay(s.sunset)));
+    $('sunrise').textContent = `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`;
+    $('sunset').textContent = `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}`;
+    $('sun-note').textContent = note;
+    $('trad-sun').textContent = `Sunrise ${t24.format(s.sunrise)} · Sunset ${t24.format(s.sunset)}${p.approx ? ' (approx.)' : ''}`;
   }
-  const a = T.sharedTen(s.sunrise) / 100000, b = T.sharedTen(s.sunset) / 100000; // turns
-  const span = T.mod(b - a, 1);
-  const [x1, y1] = polar(R_BAND, a), [x2, y2] = polar(R_BAND, b);
-  dayArc.setAttribute('d', `M${x1.toFixed(2)} ${y1.toFixed(2)} A${R_BAND} ${R_BAND} 0 ${span > 0.5 ? 1 : 0} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`);
-  sunRise.setAttribute('cx', x1); sunRise.setAttribute('cy', y1); sunRise.removeAttribute('visibility');
-  sunSet.setAttribute('cx', x2); sunSet.setAttribute('cy', y2); sunSet.removeAttribute('visibility');
-  $('sunrise').textContent = `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`;
-  $('sunset').textContent = `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}`;
-  $('sun-note').textContent = approx
-    ? `Approximate: estimated for your time zone (lat 40°, lon ${lon.toFixed(1)}°). Set your location for real sunrise and sunset.`
-    : `Real sunrise and sunset at ${lat.toFixed(2)}°, ${lon.toFixed(2)}° (NOAA algorithm).`;
+  if (!se.sunrise || !se.sunset) {
+    shade(exactDial, null);
+    $('ex-sunrise').textContent = '—'; $('ex-sunset').textContent = '—';
+    $('ex-sun-note').textContent = se.polar === 'day' ? 'Polar day.' : 'Polar night.';
+  } else {
+    const er = T.exactTen(se.sunrise, p.lon), es = T.exactTen(se.sunset, p.lon);
+    shade(exactDial, er / 100000, es / 100000);
+    $('ex-sunrise').textContent = `${tenHM(er)} · ${t12.format(se.sunrise)}`;
+    $('ex-sunset').textContent = `${tenHM(es)} · ${t12.format(se.sunset)}`;
+    $('ex-sun-note').textContent = p.approx ? 'Approximate (time-zone centre, lat 40°). Set your location for your real sun.' : 'Your real sunrise and sunset, in your meridian\'s Ten time.';
+  }
 }
 
 /* ---------- sky gradient that follows Ten-time (dusk at 0) ---------- */
@@ -152,17 +189,16 @@ function frame() {
 
   // 1. Shared (authority)
   const sh = T.sharedTen(now);
-  const shDisp = smooth ? sh : Math.floor(sh);
-  rot(hH, (shDisp / 100000) * 360);
-  rot(hM, ((shDisp % 10000) / 10000) * 360);
-  rot(hS, ((shDisp % 100) / 100) * 360);
+  mainDial.setHands(smooth ? sh : Math.floor(sh));
 
-  // 2. Traditional analogue
+  // 2. Traditional 24-hour dial
   const ls = T.localSecondsOfDay(now);
-  const lsDisp = smooth ? ls : Math.floor(ls);
-  rot(aH, ((lsDisp % 43200) / 43200) * 360);
-  rot(aM, ((lsDisp % 3600) / 3600) * 360);
-  rot(aS, ((lsDisp % 60) / 60) * 360);
+  tradDial.setHands(smooth ? ls : Math.floor(ls));
+
+  // 3. Exact (saved meridian, or time-zone centre as an approximation)
+  const exLon = loc ? loc.lon : T.zoneCentreLongitude(now);
+  const ex = T.exactTen(now, exLon);
+  exactDial.setHands(smooth ? ex : Math.floor(ex));
 
   const sec = Math.floor(sh);
   if (sec !== lastSecond) { lastSecond = sec; slowUpdate(now, sh); }
@@ -184,7 +220,8 @@ function slowUpdate(now, sh) {
   // traditional
   set('trad-time', `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`);
   set('trad-date', civilDateFmt.format(now));
-  set('trad-12', `${t12.format(now)} · the calendar date changes at midnight`);
+  set('trad-ampm', t12s.format(now));
+  set('trad-12', 'The calendar date changes at midnight (bottom of the dial).');
 
   // exact
   if (loc) {
@@ -197,8 +234,9 @@ function slowUpdate(now, sh) {
     const app = T.apparentSolarSeconds(now, loc.lon);
     set('exact-true', `True sun (apparent solar): ${T.formatTen(T.tenFromSeconds(app))} · equation of time ${T.equationOfTime(now).toFixed(1)} min`);
   } else {
-    set('exact-time', '—:——:——');
-    set('exact-date', 'Set your location to see your meridian time.');
+    const lon = T.zoneCentreLongitude(now), ex = T.exactTen(now, lon);
+    set('exact-time', `≈${T.formatTen(ex)}`);
+    set('exact-date', `Approximate, for your time-zone centre (lon ${lon.toFixed(1)}°). Set your location below.`);
     set('exact-offset', 'Same longitude = same Exact time, north or south.');
     set('exact-true', '');
   }

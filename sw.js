@@ -1,5 +1,5 @@
 // Minimal offline cache. Bump VERSION whenever files change.
-const VERSION = 'ten-v1';
+const VERSION = 'ten-v2';
 const FILES = ['./', 'index.html', 'styles.css', 'app.js', 'time.js', 'favicon.svg', 'manifest.webmanifest'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener('activate', (e) => {

@@ -43,14 +43,16 @@
       </div>
     </section>
 
-    <!-- 2. Traditional -->
+    <!-- 2. Traditional (24-hour) -->
     <section class="card trad" aria-labelledby="trad-title">
-      <h2 id="trad-title" class="eyebrow">Traditional</h2>
+      <h2 id="trad-title" class="eyebrow">Traditional · 24-hour</h2>
       <div class="trad-grid">
-        <svg id="analog" class="analog" viewBox="-100 -100 200 200" role="img" aria-label="Traditional 12-hour analogue clock"></svg>
-        <div>
-          <p class="trad-big" id="trad-time" aria-hidden="true">00:00:00</p>
+        <svg id="analog" class="analog" viewBox="-100 -100 200 200" role="img" aria-label="24-hour analogue clock: noon at the top, midnight at the bottom"></svg>
+        <div class="trad-read">
+          <p class="trad-big"><span id="trad-time" aria-hidden="true">00:00:00</span></p>
+          <p class="ampm" id="trad-ampm">—</p>
           <p class="ten-date" id="trad-date">—</p>
+          <p class="note" id="trad-sun"></p>
           <p class="note" id="trad-12">—</p>
         </div>
       </div>
@@ -59,12 +61,18 @@
     <!-- 3. Ten Exact -->
     <section class="card exact" aria-labelledby="exact-title">
       <h2 id="exact-title" class="eyebrow">Ten Exact · your meridian</h2>
-      <div class="exact-row">
-        <p class="ten-mid" id="exact-time" aria-hidden="true">—</p>
+      <div class="exact-grid">
+        <svg id="exact-dial" class="dial small" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial for your own meridian, with your sunrise and sunset"></svg>
         <div class="exact-meta">
+          <p class="ten-mid" id="exact-time" aria-hidden="true">—</p>
           <p id="exact-date" class="ten-date small">—</p>
           <p id="exact-offset" class="note">—</p>
-          <p id="exact-true" class="note">—</p>
+          <p id="exact-true" class="note"></p>
+          <dl class="sun-list left">
+            <div><dt><span class="sun-dot" aria-hidden="true"></span>Sunrise</dt><dd id="ex-sunrise">—</dd></div>
+            <div><dt><span class="sun-dot set" aria-hidden="true"></span>Sunset</dt><dd id="ex-sunset">—</dd></div>
+          </dl>
+          <p class="note" id="ex-sun-note"></p>
         </div>
       </div>
       <div class="loc">
