@@ -178,3 +178,38 @@ b { font-weight: 600; }
 .bar .lb.two.edge-l { text-align: left; } .bar .lb.two.edge-r { text-align: right; }
 .bar .lb small { display: block; font-size: .58rem; letter-spacing: .06em; color: var(--ink); opacity: .8; }
 .bars { gap: 34px; }
+
+/* Install */
+.install { margin-left: auto; }
+.ios-hint { flex-basis: 100%; margin: 4px 0 0; }
+
+/* One dial / Separate */
+.view-one .sep-only, .view-sep .one-only { display: none !important; }
+.view-one .trad-grid, .view-one .exact-grid { grid-template-columns: 1fr; }
+.view-one .trad-read, .view-one .trad .ten-date { text-align: center; }
+.ring { --rc: #ffb86b; }
+.ring.regular { --rc: #8fb8ff; } .ring.exact { --rc: #7ee0b5; }
+.r-band { fill: none; stroke: var(--rc); stroke-opacity: .07; }
+.r-night { fill: none; stroke: var(--night); }
+.r-day { fill: none; stroke: var(--day); }
+.r-tick { stroke: rgba(255,255,255,.3); stroke-width: 1; }
+.r-tick.major { stroke: var(--rc); stroke-width: 2.2; }
+.r-num { fill: var(--ink); font-weight: 500; text-anchor: middle; dominant-baseline: central; font-variant-numeric: tabular-nums; }
+.r-num.zero, .r-num.major { fill: var(--rc); font-weight: 700; }
+.r-ampm { fill: var(--rc); font-weight: 700; letter-spacing: .08em; text-anchor: middle; dominant-baseline: central; opacity: .85; }
+.zero-mark { fill: #fff; stroke: #1a1030; stroke-width: 1.2; }
+.c-hand line { stroke-linecap: round; }
+.c-hand.shared line { stroke: #ffb86b; stroke-width: 6; } .c-hand.shared circle { fill: #ffb86b; }
+.c-hand.regular line { stroke: #8fb8ff; stroke-width: 4; } .c-hand.regular circle { fill: #8fb8ff; }
+.c-hand.exact line { stroke: #7ee0b5; stroke-width: 3.5; } .c-hand.exact circle { fill: #7ee0b5; }
+.c-sec circle { fill: #fff; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
+.ring-sw { font: inherit; font-size: .85rem; color: var(--ink); background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.ring-sw[aria-pressed="false"] { color: var(--mute); opacity: .6; text-decoration: line-through; }
+.ring-sw:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+.chip { width: 12px; height: 12px; border-radius: 50%; display: inline-block; background: #ffb86b; }
+.chip.regular { background: #8fb8ff; } .chip.exact { background: #7ee0b5; }
+.legend-note { text-align: center; }
+.legend-note .sun-dot { margin-left: 8px; }
+.zero-key { display: inline-block; width: 9px; height: 9px; background: #fff; transform: rotate(45deg) scaleX(.75); margin: 0 6px 0 12px; }
+.seg button { white-space: nowrap; }

@@ -8,7 +8,11 @@
   <meta name="theme-color" content="#0b1230">
   <meta name="color-scheme" content="dark">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Ten">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.js"></script>
@@ -18,14 +22,31 @@
   <header class="top">
     <h1 class="brand"><span class="brand-mark" aria-hidden="true">10</span> Ten</h1>
     <p class="tag">Ten even hours. The new day begins at sunset.</p>
+    <button type="button" id="install-btn" class="btn small install" hidden>Install app</button>
+    <p class="note ios-hint" id="ios-hint" hidden>To install: tap <b>Share</b> <span aria-hidden="true">⎋</span>, then <b>Add to Home Screen</b>.</p>
   </header>
 
   <main>
     <!-- 1. TEN (Shared) — the authority -->
     <section class="card hero" aria-labelledby="shared-title">
-      <h2 id="shared-title" class="eyebrow"><span id="shared-label">Shared</span></h2>
+      <div class="card-head">
+        <h2 id="shared-title" class="eyebrow"><span id="shared-label">Shared</span></h2>
+        <div class="seg" role="group" aria-label="Dial view">
+          <button type="button" data-view="one" aria-pressed="true">One dial</button>
+          <button type="button" data-view="separate" aria-pressed="false">Separate</button>
+        </div>
+      </div>
       <div class="hero-grid">
-        <figure class="dial-wrap">
+        <figure class="dial-wrap one-only">
+          <svg id="combo" class="dial" viewBox="-200 -200 400 400" role="img" aria-label="One dial: outer ring Shared Ten, middle ring traditional 24-hour, inner ring Meridian Ten"></svg>
+          <figcaption class="legend" role="group" aria-label="Rings shown">
+            <button type="button" class="ring-sw" data-ring="shared" aria-pressed="true"><i class="chip shared"></i>Ten (Shared)</button>
+            <button type="button" class="ring-sw" data-ring="regular" aria-pressed="true"><i class="chip regular"></i>24h</button>
+            <button type="button" class="ring-sw" data-ring="exact" aria-pressed="true"><i class="chip exact"></i>Meridian</button>
+          </figcaption>
+          <p class="note legend-note"><span class="sun-dot" aria-hidden="true"></span>sunrise <span class="sun-dot set" aria-hidden="true"></span>sunset <span class="zero-key" aria-hidden="true"></span>0 = 6 PM new day</p>
+        </figure>
+        <figure class="dial-wrap sep-only">
           <svg id="dial" class="dial" viewBox="-200 -200 400 400" role="img" aria-labelledby="dial-desc">
             <desc id="dial-desc">Ten-hour dial, 0 at the top is sunset and the start of the new day.</desc>
           </svg>
@@ -77,7 +98,7 @@
         </div>
       </div>
       <div class="trad-grid">
-        <svg id="analog" class="analog" viewBox="-100 -100 200 200" role="img" aria-label="24-hour analogue clock: noon at the top, midnight at the bottom"></svg>
+        <svg id="analog" class="analog sep-only" viewBox="-100 -100 200 200" role="img" aria-label="24-hour analogue clock: noon at the top, midnight at the bottom"></svg>
         <div class="trad-read">
           <p class="trad-big"><span id="trad-time" aria-hidden="true">00:00:00</span></p>
           <p class="ampm" id="trad-ampm">—</p>
@@ -92,7 +113,7 @@
     <section class="card exact" aria-labelledby="exact-title">
       <h2 id="exact-title" class="eyebrow">Ten Exact · your meridian</h2>
       <div class="exact-grid">
-        <svg id="exact-dial" class="dial small" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial for your own meridian, with your sunrise and sunset"></svg>
+        <svg id="exact-dial" class="dial small sep-only" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial for your own meridian, with your sunrise and sunset"></svg>
         <div class="exact-meta">
           <p class="ten-mid" id="exact-time" aria-hidden="true">—</p>
           <p id="exact-date" class="ten-date small">—</p>

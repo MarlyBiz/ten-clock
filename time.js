@@ -201,3 +201,13 @@ export function equivalents(date, lonDeg) {
     exactDate: exactTenDate(date, lonDeg),
   };
 }
+
+/* ---------- Dial geometry ---------- */
+/** 24-hour dial position in turns (0 = top, clockwise): noon at top, 18:00 right, midnight bottom, 06:00 left. */
+export const regularDialTurns = (secOfDay) => mod(secOfDay / DAY_S - 0.5, 1);
+
+/** Concentric ring bands for the One dial: n rings share [inner, outer] radius, outermost first. */
+export function ringBands(n, outer = 196, inner = 50, gap = 3) {
+  const w = (outer - inner) / n;
+  return Array.from({ length: n }, (_, i) => ({ rOuter: outer - i * w, rInner: outer - (i + 1) * w + gap, width: w - gap }));
+}

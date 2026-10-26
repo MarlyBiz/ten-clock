@@ -141,3 +141,14 @@ test('Slider conversions round-trip on all three scales (incl. wrap and DST date
     close(T.exactTen(T.exactTenToInstant(d, v, -83.481), -83.481), v, 0.01, 'exact value');
   }
 });
+
+test('One dial geometry: 24h ring orientation and ring bands', () => {
+  assert.equal(T.regularDialTurns(12 * 3600), 0);      // noon at top
+  assert.equal(T.regularDialTurns(18 * 3600), 0.25);   // 6 PM at right (Ten 0 / day start)
+  assert.equal(T.regularDialTurns(0), 0.5);            // midnight at bottom
+  assert.equal(T.regularDialTurns(6 * 3600), 0.75);    // 6 AM at left
+  const one = T.ringBands(1), three = T.ringBands(3);
+  assert.equal(one.length, 1); assert.equal(one[0].rOuter, 196); assert.equal(one[0].rInner, 53); // one ring fills the dial
+  assert.equal(three.length, 3); assert.ok(three[0].rOuter > three[1].rOuter && three[1].rOuter > three[2].rOuter);
+  for (let i = 1; i < 3; i++) assert.ok(three[i].rOuter <= three[i - 1].rInner); // no overlap
+});

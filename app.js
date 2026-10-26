@@ -66,7 +66,7 @@ function buildTenDial(svg, { labels = true } = {}) {
 
 /** 24-hour analogue dial: noon at top, midnight at bottom (like a sun dial). */
 const R24 = 86;
-const turns24 = (sec) => T.mod(sec / 86400 - 0.5, 1); // 12:00 -> 0 turns (top)
+const turns24 = T.regularDialTurns; // 12:00 -> 0 turns (top), midnight at bottom
 function build24Dial(svg) {
   el('circle', { class: 'a-face', r: 99 }, svg);
   el('circle', { class: 'a-night', r: R24 }, svg);
@@ -205,6 +205,7 @@ function frame() {
   const exLon = loc ? loc.lon : T.zoneCentreLongitude(now);
   const ex = T.exactTen(now, exLon);
   exactDial.setHands(smooth ? ex : Math.floor(ex));
+  if (view === 'one') comboHands({ shared: smooth ? sh : Math.floor(sh), regular: smooth ? ls : Math.floor(ls), exact: smooth ? ex : Math.floor(ex) });
 
   const sec = Math.floor(sh);
   if (sec !== lastSecond) { lastSecond = sec; slowUpdate(now, sh); }
@@ -263,6 +264,141 @@ function slowUpdate(now, sh) {
 }
 
 
+
+/* ---------- One dial: concentric rings (outer Shared Ten, middle 24h, inner Meridian) ---------- */
+const VIEW_KEY = 'ten.view.v1', RINGS_KEY = 'ten.rings.v1';
+const RING_ORDER = ['shared', 'regular', 'exact'];
+let view = 'one';
+let rings = { shared: true, regular: true, exact: true };
+try {
+  if (localStorage.getItem(VIEW_KEY) === 'separate') view = 'separate';
+  const r = JSON.parse(localStorage.getItem(RINGS_KEY));
+  if (r && RING_ORDER.some((k) => r[k])) RING_ORDER.forEach((k) => { rings[k] = !!r[k]; });
+} catch { /* ignore */ }
+const combo = $('combo');
+let comboParts = { hands: {}, sun: {}, sec: null };
+const toTurns = { shared: (v) => v / 100000, regular: (v) => turns24(v), exact: (v) => v / 100000 };
+
+function buildCombo() {
+  combo.replaceChildren();
+  el('circle', { class: 'd-face', r: 198 }, combo);
+  const on = RING_ORDER.filter((k) => rings[k]);
+  const bands = T.ringBands(on.length);
+  comboParts = { hands: {}, sun: {}, sec: null };
+  on.forEach((k, i) => {
+    const { rOuter: rO, width: w } = bands[i];
+    const g = el('g', { class: `ring ${k}` }, combo);
+    el('circle', { class: 'r-band', r: rO - w / 2, 'stroke-width': w }, g);
+    const rS = rO - w * 0.17, sw = Math.min(w * 0.26, 22);
+    el('circle', { class: 'r-night', r: rS, 'stroke-width': sw }, g);
+    const dayArc = el('path', { class: 'r-day', d: '', 'stroke-width': sw }, g);
+    const ten = k !== 'regular';
+    const nT = ten ? 100 : 96;
+    for (let t = 0; t < nT; t++) {
+      const major = ten ? t % 10 === 0 : t % 4 === 0;
+      if (!major && w < 40 && t % (ten ? 5 : 2)) continue;
+      const [x1, y1] = polar(rO - w * (major ? 0.36 : 0.28), t / nT), [x2, y2] = polar(rO - w * 0.05, t / nT);
+      el('line', { class: `r-tick${major ? ' major' : ''}`, x1, y1, x2, y2 }, g);
+    }
+    const rN = rO - w * 0.64;
+    if (ten) {
+      const fs = Math.min(28, w * 0.34);
+      for (let h = 0; h < 10; h++) {
+        const [x, y] = polar(rN, h / 10);
+        el('text', { class: `r-num${h === 0 ? ' zero' : ''}`, x, y, 'font-size': fs }, g).textContent = h;
+      }
+    } else {
+      const all = w >= 70, fs = Math.min(15, w * (all ? 0.2 : 0.27));
+      for (let h = 0; h < 24; h += all ? 1 : 2) {
+        const [x, y] = polar(rN, turns24(h * 3600));
+        el('text', { class: `r-num${h % 6 === 0 ? ' major' : ''}`, x, y, 'font-size': fs }, g).textContent = h;
+      }
+      const fa = Math.max(7, Math.min(11, w * 0.15));
+      for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
+        const [x, y] = polar(rO - w * 0.9, turns24(hr * 3600));
+        el('text', { class: 'r-ampm', x, y, 'font-size': fa }, g).textContent = lab;
+      }
+    }
+    // fixed day-start mark (Ten 0 = 6 PM): a white diamond on the band edge — distinct from the sun dots
+    const zt = ten ? 0 : turns24(18 * 3600), [zx, zy] = polar(rO - w * 0.17, zt), d = Math.min(9, w * 0.16);
+    el('path', { class: 'zero-mark', d: `M${zx} ${zy - d}L${zx + d * 0.7} ${zy}L${zx} ${zy + d}L${zx - d * 0.7} ${zy}Z`, transform: `rotate(${zt * 360} ${zx} ${zy})` }, g);
+    const sr = Math.max(4, Math.min(7.5, w * 0.12));
+    const rise = el('circle', { class: 'd-sun', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
+    const set = el('circle', { class: 'd-sun set', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
+    comboParts.sun[k] = { dayArc, rise, set, R: rS };
+    comboParts.hands[k] = { len: rO - w * 0.42 };
+  });
+  // hands on top, outer ring's (Shared) drawn last so it is most prominent
+  [...on].reverse().forEach((k) => {
+    const len = comboParts.hands[k].len;
+    const gh = el('g', { class: `c-hand ${k}` }, combo);
+    el('line', { x1: 0, y1: 12, x2: 0, y2: -len }, gh);
+    el('circle', { cx: 0, cy: -len, r: k === 'shared' ? 5 : 4 }, gh);
+    comboParts.hands[k].g = gh;
+  });
+  if (rings.shared) { // smooth Ten-second sweep dot on the outer edge
+    comboParts.sec = el('g', { class: 'c-sec' }, combo);
+    el('circle', { cx: 0, cy: -192, r: 3.2 }, comboParts.sec);
+  }
+  el('circle', { class: 'hub', r: 6 }, combo);
+  document.querySelectorAll('.ring-sw').forEach((b) => b.setAttribute('aria-pressed', String(rings[b.dataset.ring])));
+  paintComboSun();
+}
+
+function paintComboSun() {
+  if (!SL.sun || !combo.firstChild) return;
+  const { s, se, lon } = SL.sun;
+  for (const [k, part] of Object.entries(comboParts.sun)) {
+    const src = k === 'exact' ? se : s;
+    if (!src.sunrise || !src.sunset) { shade(part, null); continue; }
+    const f = k === 'shared' ? (d) => T.sharedTen(d) / 1e5 : k === 'regular' ? (d) => turns24(T.localSecondsOfDay(d)) : (d) => T.exactTen(d, lon) / 1e5;
+    shade(part, f(src.sunrise), f(src.sunset));
+  }
+}
+
+function comboHands(v) {
+  for (const [k, h] of Object.entries(comboParts.hands)) if (h.g) rot(h.g, toTurns[k](v[k]) * 360);
+  if (comboParts.sec) rot(comboParts.sec, ((v.shared % 100) / 100) * 360);
+}
+
+function applyView() {
+  document.body.classList.toggle('view-one', view === 'one');
+  document.body.classList.toggle('view-sep', view !== 'one');
+  document.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+}
+document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
+  view = b.dataset.view; try { localStorage.setItem(VIEW_KEY, view); } catch { /* ignore */ }
+  applyView();
+}));
+document.querySelectorAll('.ring-sw').forEach((b) => b.addEventListener('click', () => {
+  const k = b.dataset.ring;
+  if (rings[k] && RING_ORDER.filter((x) => rings[x]).length === 1) return; // keep at least one ring
+  rings[k] = !rings[k];
+  try { localStorage.setItem(RINGS_KEY, JSON.stringify(rings)); } catch { /* ignore */ }
+  buildCombo();
+}));
+applyView();
+
+/* ---------- Install (PWA) ---------- */
+const installBtn = $('install-btn'), iosHint = $('ios-hint');
+const standaloneMQ = matchMedia('(display-mode: standalone)');
+const isStandalone = () => standaloneMQ.matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+function refreshInstall() {
+  const show = !isStandalone() && (installEvt || isIOS);
+  installBtn.hidden = !show;
+  if (!show) iosHint.hidden = true;
+}
+addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; refreshInstall(); });
+addEventListener('appinstalled', () => { installEvt = null; refreshInstall(); });
+standaloneMQ.addEventListener?.('change', refreshInstall);
+installBtn.addEventListener('click', async () => {
+  if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch { /* ignore */ } installEvt = null; refreshInstall(); }
+  else if (isIOS) iosHint.hidden = !iosHint.hidden;
+});
+refreshInstall();
+
 /* ---------- Slide time: three linked bars, one slider ---------- */
 const SL = { drive: 'shared', live: true, instant: new Date(), sun: null };
 const DRIVE_KEY = 'ten.slideBy.v1';
@@ -302,7 +438,7 @@ function buildBars() {
   placeRange();
 }
 
-function sliderSun(s, se, p) { SL.sun = { s, se, lon: p.lon }; paintSun(); }
+function sliderSun(s, se, p) { SL.sun = { s, se, lon: p.lon }; paintSun(); paintComboSun(); }
 function paintSun() {
   const { s, se, lon } = SL.sun;
   const spans = {
@@ -435,6 +571,7 @@ document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('
 }));
 applyFmt();
 
+buildCombo();
 renderLocUI();
 requestAnimationFrame(frame);
 
