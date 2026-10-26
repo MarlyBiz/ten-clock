@@ -45,7 +45,13 @@
 
     <!-- 2. Traditional (24-hour) -->
     <section class="card trad" aria-labelledby="trad-title">
-      <h2 id="trad-title" class="eyebrow">Traditional · 24-hour</h2>
+      <div class="card-head">
+        <h2 id="trad-title" class="eyebrow">Traditional</h2>
+        <div class="seg" role="group" aria-label="Hour format">
+          <button type="button" data-fmt="12" aria-pressed="true">12h</button>
+          <button type="button" data-fmt="24" aria-pressed="false">24h</button>
+        </div>
+      </div>
       <div class="trad-grid">
         <svg id="analog" class="analog" viewBox="-100 -100 200 200" role="img" aria-label="24-hour analogue clock: noon at the top, midnight at the bottom"></svg>
         <div class="trad-read">

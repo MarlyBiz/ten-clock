@@ -130,3 +130,10 @@ b { font-weight: 600; }
 .hand.ah { stroke: var(--ink); stroke-width: 5; }
 .hand.am { stroke: var(--ink); stroke-width: 3; }
 .hand.as { stroke: var(--accent); stroke-width: 1.2; }
+
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.card-head .eyebrow { margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: rgba(255,255,255,.04); }
+.seg button { font: inherit; font-size: .8rem; font-weight: 600; color: var(--mute); background: transparent; border: 0; border-radius: 999px; padding: 5px 12px; min-height: 32px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #1a1030; }
+.seg button:focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }

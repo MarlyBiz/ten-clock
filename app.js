@@ -110,8 +110,13 @@ const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'nu
 const fmtYMD = ({ y, m, d }) => dateFmt.format(new Date(Date.UTC(y, m - 1, d)));
 const civilDateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
 const t12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
-const t12s = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
 const t24 = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const t12en = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+
+/* ---------- 12h / 24h preference (default 12h, remembered) ---------- */
+const FMT_KEY = 'ten.hourFormat.v1';
+let hourFmt = (() => { try { return localStorage.getItem(FMT_KEY) === '24' ? '24' : '12'; } catch { return '12'; } })();
+const tradHM = (d) => (hourFmt === '24' ? t24 : t12).format(d);
 const tenHM = (total) => { const { h, m } = T.splitTen(total); return `${h}:${pad(m)}`; };
 function dur(sec) {
   const s = Math.round(Math.abs(sec)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
@@ -145,7 +150,7 @@ function updateSun(now, tenDate) {
     $('sunrise').textContent = `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`;
     $('sunset').textContent = `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}`;
     $('sun-note').textContent = note;
-    $('trad-sun').textContent = `Sunrise ${t24.format(s.sunrise)} · Sunset ${t24.format(s.sunset)}${p.approx ? ' (approx.)' : ''}`;
+    $('trad-sun').textContent = `Sunrise ${tradHM(s.sunrise)} · Sunset ${tradHM(s.sunset)}${p.approx ? ' (approx.)' : ''}`;
   }
   if (!se.sunrise || !se.sunset) {
     shade(exactDial, null);
@@ -218,9 +223,11 @@ function slowUpdate(now, sh) {
   sky(T.tenHourPosition(sh));
 
   // traditional
-  set('trad-time', `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`);
+  const h24 = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const h12 = t12en.format(now).replace(/\u202f|\s/g, ' ');
+  set('trad-time', hourFmt === '24' ? h24 : h12);
+  set('trad-ampm', hourFmt === '24' ? h12 : `${h24} · 24-hour`);
   set('trad-date', civilDateFmt.format(now));
-  set('trad-ampm', t12s.format(now));
   set('trad-12', 'The calendar date changes at midnight (bottom of the dial).');
 
   // exact
@@ -288,6 +295,17 @@ $('loc-form').addEventListener('submit', (e) => {
   st.textContent = 'Location saved on this device only.';
 });
 $('loc-clear').addEventListener('click', () => { saveLoc(null); $('lon-in').value = ''; $('lat-in').value = ''; $('loc-status').textContent = 'Location cleared.'; });
+
+function applyFmt() {
+  document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fmt === hourFmt)));
+  sunKey = ''; lastSecond = -1;
+}
+document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('click', () => {
+  hourFmt = b.dataset.fmt;
+  try { localStorage.setItem(FMT_KEY, hourFmt); } catch { /* private mode */ }
+  applyFmt();
+}));
+applyFmt();
 
 renderLocUI();
 requestAnimationFrame(frame);
