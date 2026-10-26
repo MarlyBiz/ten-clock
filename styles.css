@@ -137,3 +137,44 @@ b { font-weight: 600; }
 .seg button { font: inherit; font-size: .8rem; font-weight: 600; color: var(--mute); background: transparent; border: 0; border-radius: 999px; padding: 5px 12px; min-height: 32px; cursor: pointer; }
 .seg button[aria-pressed="true"] { background: var(--accent); color: #1a1030; }
 .seg button:focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }
+
+/* Slide time */
+.btn.small { min-height: 32px; padding: 5px 14px; font-size: .85rem; }
+.btn[aria-pressed="true"]#sl-now { border-color: var(--accent); color: var(--accent); }
+.seg.wide { display: flex; width: 100%; align-items: center; }
+.seg.wide button { flex: 1; }
+.seg-label { font-size: .75rem; color: var(--mute); padding: 0 8px 0 10px; white-space: nowrap; }
+.sl-big { margin: 12px 0 0; text-align: center; font-size: clamp(2.4rem, 12vw, 3.6rem); font-weight: 300; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.sl-eq { margin: 4px 0 0; text-align: center; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.sl-eq b { color: var(--accent); }
+.sl-datenote { text-align: center; min-height: 1.3em; }
+.bars { position: relative; margin: 14px 0 6px; display: grid; gap: 30px; padding-bottom: 18px; }
+.bar-row { display: grid; grid-template-columns: 62px 1fr; align-items: center; gap: 8px; }
+.bar-name { font-size: .78rem; color: var(--mute); text-transform: uppercase; letter-spacing: .06em; }
+.bar-row.driving .bar-name { color: var(--accent); font-weight: 700; }
+.bar { position: relative; height: 22px; border-radius: 6px; background: var(--night); overflow: visible; }
+.bar .seg-day { position: absolute; top: 0; bottom: 0; background: var(--day); }
+.bar .half { position: absolute; top: 0; bottom: 0; width: 50%; }
+.bar .half.am { left: 0; background: rgba(143,184,255,.16); border-radius: 6px 0 0 6px; }
+.bar .half.pm { left: 50%; background: rgba(255,184,107,.14); border-radius: 0 6px 6px 0; }
+.bar .half span { position: absolute; top: 3px; font-size: .62rem; font-weight: 700; letter-spacing: .08em; color: rgba(255,255,255,.75); }
+.bar .half.am span { left: 6px; } .bar .half.pm span { right: 6px; }
+.bar .tk { position: absolute; bottom: 0; width: 1px; height: 7px; background: rgba(255,255,255,.35); transform: translateX(-.5px); }
+.bar .tk.major { height: 22px; background: rgba(255,255,255,.22); }
+.bar .lb { position: absolute; top: 25px; transform: translateX(-50%); font-size: .7rem; color: var(--mute); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.bar .lb.edge-l { transform: none; } .bar .lb.edge-r { transform: translateX(-100%); }
+.bar .sun { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #ffd27a; box-shadow: 0 0 6px #ffb84d; }
+.bar .sun.set { background: #ff8a5c; }
+.bar .mk { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 2px rgba(10,14,40,.7); }
+.bar-row.driving .mk { display: none; }
+.sl-range { position: absolute; left: 55px; margin: 0; height: 36px; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; touch-action: none; width: calc(100% - 40px); }
+.sl-range::-webkit-slider-runnable-track { height: 36px; background: transparent; }
+.sl-range::-moz-range-track { height: 36px; background: transparent; }
+.sl-range::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: 3px; border-radius: 50%; background: var(--accent); border: 3px solid #1a1030; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }
+.sl-range::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); border: 3px solid #1a1030; box-shadow: 0 0 0 2px var(--accent); }
+.sl-range:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; border-radius: 8px; }
+
+.bar .lb.two { line-height: 1.05; text-align: center; }
+.bar .lb.two.edge-l { text-align: left; } .bar .lb.two.edge-r { text-align: right; }
+.bar .lb small { display: block; font-size: .58rem; letter-spacing: .06em; color: var(--ink); opacity: .8; }
+.bars { gap: 34px; }

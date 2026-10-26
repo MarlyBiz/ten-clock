@@ -163,6 +163,7 @@ function updateSun(now, tenDate) {
     $('ex-sunset').textContent = `${tenHM(es)} · ${t12.format(se.sunset)}`;
     $('ex-sun-note').textContent = p.approx ? 'Approximate (time-zone centre, lat 40°). Set your location for your real sun.' : 'Your real sunrise and sunset, in your meridian\'s Ten time.';
   }
+  sliderSun(s, se, p);
 }
 
 /* ---------- sky gradient that follows Ten-time (dusk at 0) ---------- */
@@ -220,6 +221,7 @@ function slowUpdate(now, sh) {
     ? 'New day began at sunset hour 0 (6 PM).'
     : 'The new day begins at 0:00:00, which is 6 PM.');
   updateSun(now, td);
+  sliderTick(now);
   sky(T.tenHourPosition(sh));
 
   // traditional
@@ -260,6 +262,131 @@ function slowUpdate(now, sh) {
   if (live !== lastLive) { lastLive = live; $('live').textContent = `Ten time ${live}, ${fmtYMD(td)}`; }
 }
 
+
+/* ---------- Slide time: three linked bars, one slider ---------- */
+const SL = { drive: 'shared', live: true, instant: new Date(), sun: null };
+const DRIVE_KEY = 'ten.slideBy.v1';
+try { const v = localStorage.getItem(DRIVE_KEY); if (['shared', 'regular', 'exact'].includes(v)) SL.drive = v; } catch { /* ignore */ }
+const bars = { shared: $('bar-shared'), regular: $('bar-regular'), exact: $('bar-exact') };
+const range = $('sl-range');
+const slLon = () => (loc ? loc.lon : T.zoneCentreLongitude(SL.instant));
+const div = (cls, parent, left) => { const d = document.createElement('div'); d.className = cls; if (left != null) d.style.left = `${left * 100}%`; parent.appendChild(d); return d; };
+const fracs = (d) => ({ shared: T.sharedTen(d) / 100000, regular: T.localSecondsOfDay(d) / 86400, exact: T.exactTen(d, slLon()) / 100000 });
+
+function buildBars() {
+  for (const [name, bar] of Object.entries(bars)) {
+    bar.replaceChildren();
+    if (name === 'regular') {
+      if (hourFmt === '12') {
+        div('half am', bar).appendChild(Object.assign(document.createElement('span'), { textContent: 'AM' }));
+        div('half pm', bar).appendChild(Object.assign(document.createElement('span'), { textContent: 'PM' }));
+      }
+      bar.dataset.day = '1';
+      for (let hr = 0; hr <= 24; hr++) div(`tk${hr % 3 === 0 ? ' major' : ''}`, bar, hr / 24);
+      const lab12 = ['12 AM', '3', '6', '9', '12 PM', '3', '6', '9', '12 AM'];
+      for (let j = 0; j <= 8; j++) {
+        const l = div(`lb${j === 0 ? ' edge-l' : j === 8 ? ' edge-r' : ''}`, bar, j / 8);
+        if (hourFmt === '12' && j % 4 === 0) { // 12 AM / 12 PM / 12 AM as two lines so they never collide
+          l.textContent = '12'; l.classList.add('two');
+          l.appendChild(Object.assign(document.createElement('small'), { textContent: j === 4 ? 'PM' : 'AM' }));
+        } else l.textContent = hourFmt === '12' ? lab12[j] : String(j * 3);
+      }
+    } else {
+      for (let t = 0; t <= 20; t++) div(`tk${t % 2 === 0 ? ' major' : ''}`, bar, t / 20);
+      for (let t = 0; t <= 10; t++) div(`lb${t === 0 ? ' edge-l' : t === 10 ? ' edge-r' : ''}`, bar, t / 10).textContent = t;
+    }
+    bar._mk = div('mk', bar, 0);
+    bar._sun = [];
+  }
+  if (SL.sun) paintSun();
+  placeRange();
+}
+
+function sliderSun(s, se, p) { SL.sun = { s, se, lon: p.lon }; paintSun(); }
+function paintSun() {
+  const { s, se, lon } = SL.sun;
+  const spans = {
+    shared: s.sunrise && [T.sharedTen(s.sunrise) / 1e5, T.sharedTen(s.sunset) / 1e5],
+    regular: s.sunrise && [T.localSecondsOfDay(s.sunrise) / 86400, T.localSecondsOfDay(s.sunset) / 86400],
+    exact: se.sunrise && [T.exactTen(se.sunrise, lon) / 1e5, T.exactTen(se.sunset, lon) / 1e5],
+  };
+  for (const [name, bar] of Object.entries(bars)) {
+    bar.querySelectorAll('.seg-day, .sun').forEach((n) => n.remove());
+    const sp = spans[name]; if (!sp) continue;
+    const [a, b] = sp;
+    const seg = (l, r) => { const d = div('seg-day', bar, l); d.style.width = `${(r - l) * 100}%`; bar.insertBefore(d, bar.firstChild); };
+    if (a <= b) seg(a, b); else { seg(a, 1); seg(0, b); } // wraps across 0
+    div('sun', bar, a); div('sun set', bar, b);
+    bar.appendChild(bar._mk); // keep marker on top
+  }
+}
+
+function placeRange() {
+  const row = bars[SL.drive].parentElement;
+  document.querySelectorAll('.bar-row').forEach((r) => r.classList.toggle('driving', r === row));
+  range.style.top = `${bars[SL.drive].offsetTop + 11 - 18}px`; // bar's offsetParent is .bars
+  if (SL.drive === 'regular') { range.max = 1435; range.step = 5; range.setAttribute('aria-label', 'Slide regular time, 5-minute steps'); }
+  else { range.max = 999; range.step = 1; range.setAttribute('aria-label', `Slide ${SL.drive === 'shared' ? 'Ten' : 'Meridian'} time, 1 Ten-minute steps`); }
+  document.querySelectorAll('[data-drive]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.drive === SL.drive)));
+  syncRange();
+}
+
+function syncRange() {
+  const f = fracs(SL.instant)[SL.drive];
+  range.value = SL.drive === 'regular' ? Math.round((f * 1440) / 5) * 5 % 1440 : Math.floor(f * 1000 + 1e-9) % 1000;
+}
+
+const regStr = (d) => (hourFmt === '24' ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : t12.format(d));
+function sliderRender() {
+  const d = SL.instant, lon = slLon();
+  const e = T.equivalents(d, lon);
+  const f = fracs(d);
+  for (const [name, bar] of Object.entries(bars)) bar._mk.style.left = `${f[name] * 100}%`;
+  const ten = T.formatTen(e.shared), mer = T.formatTen(e.exact), reg = regStr(d);
+  const big = { shared: `Ten ${ten}`, regular: reg, exact: `Meridian ${mer}` }[SL.drive];
+  set('sl-big', big);
+  range.setAttribute('aria-valuetext', big);
+  const parts = { shared: `Ten <b>${ten}</b>`, regular: `<b>${reg}</b>`, exact: `Meridian <b>${mer}</b>${loc ? '' : ' (approx.)'}` };
+  const order = [SL.drive, ...['regular', 'shared', 'exact'].filter((x) => x !== SL.drive)];
+  const html = order.map((k) => parts[k]).join(' = ');
+  if (last['sl-eq'] !== html) { last['sl-eq'] = html; $('sl-eq').innerHTML = html; }
+  const same = (x, y) => x.y === y.y && x.m === y.m && x.d === y.d;
+  const dates = [];
+  if (!same(e.regularDate, e.sharedDate) || !same(e.regularDate, e.exactDate)) {
+    dates.push(`Regular date ${fmtYMD(e.regularDate)} (starts at midnight)`);
+    dates.push(`Ten date ${fmtYMD(e.sharedDate)}`);
+    if (!same(e.sharedDate, e.exactDate)) dates.push(`Meridian date ${fmtYMD(e.exactDate)}`);
+    dates.push('Ten days start at 0 = 6 PM');
+  }
+  set('sl-datenote', dates.join(' · '));
+  $('sl-now').setAttribute('aria-pressed', String(SL.live));
+  $('sl-now').textContent = SL.live ? 'Live' : 'Now';
+}
+
+function sliderTick(now) {
+  if (!SL.live) { sliderRender(); return; }
+  SL.instant = now;
+  syncRange();
+  sliderRender();
+}
+
+range.addEventListener('input', () => {
+  const v = +range.value, base = SL.instant;
+  SL.live = false;
+  SL.instant = SL.drive === 'regular' ? T.regularToInstant(base, v * 60)
+    : SL.drive === 'shared' ? T.sharedTenToInstant(base, v * 100)
+    : T.exactTenToInstant(base, v * 100, slLon());
+  sliderRender();
+});
+document.querySelectorAll('[data-drive]').forEach((b) => b.addEventListener('click', () => {
+  SL.drive = b.dataset.drive;
+  try { localStorage.setItem(DRIVE_KEY, SL.drive); } catch { /* ignore */ }
+  placeRange(); sliderRender();
+}));
+$('sl-now').addEventListener('click', () => { SL.live = true; sliderTick(new Date()); });
+addEventListener('resize', placeRange);
+buildBars();
+
 /* ---------- location UI ---------- */
 function renderLocUI() {
   $('loc-clear').hidden = !loc;
@@ -299,6 +426,7 @@ $('loc-clear').addEventListener('click', () => { saveLoc(null); $('lon-in').valu
 function applyFmt() {
   document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fmt === hourFmt)));
   sunKey = ''; lastSecond = -1;
+  buildBars(); sliderRender();
 }
 document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('click', () => {
   hourFmt = b.dataset.fmt;

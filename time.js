@@ -166,3 +166,38 @@ export function zoneCentreLongitude(date = new Date()) {
   const std = Math.max(new Date(y, 0, 1).getTimezoneOffset(), new Date(y, 6, 1).getTimezoneOffset());
   return -std / 4;
 }
+
+/* ---------- Slider conversions: a value on one scale -> an instant ---------- */
+// Each takes a reference instant `base` and keeps you in the same day *of that scale*
+// (civil day for Regular, Ten day for Shared/Exact), so dragging never jumps a day.
+
+/** Regular (civil) seconds of day on base's civil date -> Date. Uses wall-clock (DST-aware). */
+export function regularToInstant(base, secOfDay) {
+  return new Date(base.getFullYear(), base.getMonth(), base.getDate(), 0, 0, 0, Math.round(secOfDay * 1000));
+}
+
+/** Shared Ten (total Ten-seconds) in base's Shared Ten day -> Date. Ten day D starts 18:00 on D−1. */
+export function sharedTenToInstant(base, tenTotal) {
+  const td = sharedTenDate(base);
+  const ms = Math.round((ZERO_OFFSET_S + mod(tenTotal, 100000) * TEN_SECOND_S) * 1000);
+  return new Date(td.y, td.m - 1, td.d - 1, 0, 0, 0, ms);
+}
+
+/** Exact Ten (total Ten-seconds) in base's Exact Ten day at lonDeg -> Date. */
+export function exactTenToInstant(base, tenTotal, lonDeg) {
+  const td = exactTenDate(base, lonDeg);
+  const startLmst = Date.UTC(td.y, td.m - 1, td.d - 1) + ZERO_OFFSET_S * 1000; // 18:00 LMST, expressed as if UTC
+  return new Date(startLmst - lonDeg * 240000 + Math.round(mod(tenTotal, 100000) * TEN_SECOND_S * 1000));
+}
+
+/** All three readings of one instant. */
+export function equivalents(date, lonDeg) {
+  return {
+    regular: localSecondsOfDay(date),
+    shared: sharedTen(date),
+    exact: exactTen(date, lonDeg),
+    regularDate: { y: date.getFullYear(), m: date.getMonth() + 1, d: date.getDate() },
+    sharedDate: sharedTenDate(date),
+    exactDate: exactTenDate(date, lonDeg),
+  };
+}

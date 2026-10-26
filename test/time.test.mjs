@@ -97,3 +97,47 @@ test('Equation of time is sane (Nov ~ +16 min, Feb ~ −14 min)', () => {
   close(T.equationOfTime(new Date('2026-11-03T12:00:00Z')), 16.4, 0.5, 'Nov EoT');
   close(T.equationOfTime(new Date('2026-02-11T12:00:00Z')), -14.2, 0.5, 'Feb EoT');
 });
+
+test('Slider conversions: Detroit EDT, lon −83.481', () => {
+  const lon = -83.481;
+  const base = new Date('2026-10-26T12:00:00Z'); // Mon Oct 26 2026, 8 AM EDT
+  // 9:00 AM -> Ten 6:25:00; Meridian = LMST 07:26:04.56 -> 5:59:77
+  const nine = T.regularToInstant(base, 9 * 3600);
+  assert.equal(nine.toISOString(), '2026-10-26T13:00:00.000Z');
+  let e = T.equivalents(nine, lon);
+  assert.equal(T.formatTen(e.shared), '6:25:00');
+  assert.equal(T.formatTen(e.exact), '5:59:77');
+  close(e.exact - e.shared, T.exactMinusSharedSeconds(nine, lon) / T.TEN_SECOND_S, 1e-6, 'meridian = shared + offset');
+  // 5:00 PM -> Ten 9:58:33 (17:00 is 23 h after 18:00: 82800/0.864 = 95833.3); Meridian LMST 15:26:04.56 -> 8:93:10
+  const five = T.regularToInstant(base, 17 * 3600);
+  e = T.equivalents(five, lon);
+  assert.equal(T.formatTen(e.shared), '9:58:33');
+  assert.equal(T.formatTen(e.exact), '8:93:10');
+  assert.deepEqual(e.sharedDate, { y: 2026, m: 10, d: 26, rolled: false });
+  // 9 PM: regular date is the 26th, Ten date already the 27th
+  e = T.equivalents(T.regularToInstant(base, 21 * 3600), lon);
+  assert.equal(e.regularDate.d, 26); assert.equal(e.sharedDate.d, 27);
+  // Ten 6:25:00 in base's Ten day -> 9:00 AM EDT
+  assert.equal(T.sharedTenToInstant(base, 62500).toISOString(), '2026-10-26T13:00:00.000Z');
+  // Meridian 0 (sunset/new day) at Walled Lake = 18:00 LMST = 23:33:55.44 UTC (on Oct 25 for base's Exact day)
+  assert.equal(T.exactTenToInstant(base, 0, lon).toISOString(), '2026-10-25T23:33:55.440Z');
+});
+
+test('Slider conversions round-trip on all three scales (incl. wrap and DST dates)', () => {
+  const lons = [-83.481, 0, 151.2, -179.9, 179.9];
+  const start = Date.parse('2026-01-01T00:00:00Z');
+  for (let i = 0; i < 400; i++) {
+    const d = new Date(start + i * 7.3 * 3600 * 1000 + i * 1234);
+    // skip the repeated 1-2 AM hour on the November fall-back night (ambiguous wall-clock)
+    const ambiguous = d.getMonth() === 10 && d.getDate() === 1 && d.getHours() === 1;
+    if (!ambiguous) {
+      close(T.regularToInstant(d, T.localSecondsOfDay(d)).getTime(), d.getTime(), 1, 'regular round-trip');
+      close(T.sharedTenToInstant(d, T.sharedTen(d)).getTime(), d.getTime(), 1, 'shared round-trip');
+    }
+    for (const lon of lons) close(T.exactTenToInstant(d, T.exactTen(d, lon), lon).getTime(), d.getTime(), 1, `exact round-trip ${lon}`);
+    // value -> instant -> value
+    const v = (i * 997) % 100000;
+    close(T.sharedTen(T.sharedTenToInstant(d, v)), v, 0.01, 'shared value');
+    close(T.exactTen(T.exactTenToInstant(d, v, -83.481), -83.481), v, 0.01, 'exact value');
+  }
+});
