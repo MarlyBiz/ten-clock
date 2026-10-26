@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ten-clock",
+  "compatibility_date": "2026-10-26",
+  "assets": { "directory": "./dist" },
+  "routes": [{ "pattern": "ten.marlylabs.app", "custom_domain": true }],
+  "workers_dev": false
+}

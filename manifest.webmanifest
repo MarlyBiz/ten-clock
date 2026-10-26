@@ -1,0 +1,13 @@
+{
+  "name": "Ten — the 10-hour sunset clock",
+  "short_name": "Ten",
+  "description": "A perfectly even 10-hour clock. Hour 0 is sunset; the new day begins there.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1230",
+  "theme_color": "#0b1230",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

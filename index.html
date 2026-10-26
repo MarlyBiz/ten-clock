@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ten — a 10-hour clock where the day begins at sunset</title>
+  <meta name="description" content="Ten: a perfectly even 10-hour clock. Hour 0 is sunset (6 PM) and the new day begins there. Shared time-zone time, your exact meridian time, and a star clock.">
+  <meta name="theme-color" content="#0b1230">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#explain">Skip to how it works</a>
+  <header class="top">
+    <h1 class="brand"><span class="brand-mark" aria-hidden="true">10</span> Ten</h1>
+    <p class="tag">Ten even hours. The new day begins at sunset.</p>
+  </header>
+
+  <main>
+    <!-- 1. TEN (Shared) — the authority -->
+    <section class="card hero" aria-labelledby="shared-title">
+      <h2 id="shared-title" class="eyebrow"><span id="shared-label">Shared</span></h2>
+      <div class="hero-grid">
+        <figure class="dial-wrap">
+          <svg id="dial" class="dial" viewBox="-200 -200 400 400" role="img" aria-labelledby="dial-desc">
+            <desc id="dial-desc">Ten-hour dial, 0 at the top is sunset and the start of the new day.</desc>
+          </svg>
+        </figure>
+        <div class="hero-read">
+          <p class="ten-big" id="shared-time" aria-hidden="true">0:00:00</p>
+          <p class="ten-date"><span id="shared-date">—</span></p>
+          <p class="note" id="shared-rollnote"></p>
+          <dl class="sun-list" id="sun-list">
+            <div><dt><span class="sun-dot" aria-hidden="true"></span>Sunrise</dt><dd id="sunrise">—</dd></div>
+            <div><dt><span class="sun-dot set" aria-hidden="true"></span>Sunset</dt><dd id="sunset">—</dd></div>
+          </dl>
+          <p class="note" id="sun-note"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. Traditional -->
+    <section class="card trad" aria-labelledby="trad-title">
+      <h2 id="trad-title" class="eyebrow">Traditional</h2>
+      <div class="trad-grid">
+        <svg id="analog" class="analog" viewBox="-100 -100 200 200" role="img" aria-label="Traditional 12-hour analogue clock"></svg>
+        <div>
+          <p class="trad-big" id="trad-time" aria-hidden="true">00:00:00</p>
+          <p class="ten-date" id="trad-date">—</p>
+          <p class="note" id="trad-12">—</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Ten Exact -->
+    <section class="card exact" aria-labelledby="exact-title">
+      <h2 id="exact-title" class="eyebrow">Ten Exact · your meridian</h2>
+      <div class="exact-row">
+        <p class="ten-mid" id="exact-time" aria-hidden="true">—</p>
+        <div class="exact-meta">
+          <p id="exact-date" class="ten-date small">—</p>
+          <p id="exact-offset" class="note">—</p>
+          <p id="exact-true" class="note">—</p>
+        </div>
+      </div>
+      <div class="loc">
+        <button type="button" id="geo-btn" class="btn">Set my location</button>
+        <form id="loc-form" class="loc-form" autocomplete="off">
+          <label>Longitude <input id="lon-in" inputmode="decimal" placeholder="-83.47" required></label>
+          <label>Latitude <input id="lat-in" inputmode="decimal" placeholder="42.54 (optional)"></label>
+          <button type="submit" class="btn ghost">Save</button>
+          <button type="button" id="loc-clear" class="btn ghost" hidden>Clear</button>
+        </form>
+        <p class="note" id="loc-status">Your location stays on this device (localStorage). Nothing is sent anywhere.</p>
+      </div>
+    </section>
+
+    <!-- Star clock -->
+    <section class="card star" aria-labelledby="star-title">
+      <h2 id="star-title" class="eyebrow">Star clock</h2>
+      <p class="star-line"><span>Greenwich <b id="gmst">—</b></span><span>Local <b id="lst">—</b></span><span>Star-Ten <b id="lst-ten">—</b></span></p>
+      <p class="note">Sidereal time follows Earth's spin against the stars (23h 56m 4.09s). It gains about 3m 56s a day on the sun, so it is shown here for reference, not used for Ten.</p>
+    </section>
+
+    <section class="card explain" id="explain" aria-labelledby="explain-title">
+      <h2 id="explain-title">How Ten works</h2>
+      <h3>Ten even hours, starting at sunset</h3>
+      <p>The day starts at sunset, as in the Bible. Ten puts that moment at <b>0:00:00</b>, which is traditional <b>6 PM</b>, and that's when the date changes. A day has <b>10 hours</b>, an hour has <b>100 minutes</b> and a minute has <b>100 seconds</b>. That makes 100,000 Ten-seconds a day, each 0.864 ordinary seconds. Midnight is 2:50, 6 AM is 5:00 and noon is 7:50.</p>
+      <h3>Shared and Exact</h3>
+      <p><b>Shared</b> follows your time zone, so everyone in it reads the same time and can say "call you at 2". <b>Exact</b> is mean solar time on your own line of longitude. It depends only on that longitude, so people due north and due south of you, in either hemisphere, have exactly the same Exact time.</p>
+      <h3>An honest note on the physics</h3>
+      <p>Measured against the stars, Earth turns once every 23h 56m 4.09s (the sidereal day). That's about 4 minutes shorter than the sun day. A clock built on the star day would slip 4 minutes a day against sunset and go a full lap in a year. That's why Ten's hours follow the sun day and the star clock is shown separately. The calendar needs leap days only because a year isn't a whole number of days. A time-of-day clock never needs them.</p>
+    </section>
+  </main>
+
+  <footer class="foot"><p>Ten · an idea by Mark Athanson · works offline · no tracking</p></footer>
+  <p class="sr-only" aria-live="polite" id="live"></p>
+</body>
+</html>
