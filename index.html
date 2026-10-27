@@ -27,39 +27,59 @@
   </header>
 
   <main>
-    <!-- 1. TEN (Shared) — the authority -->
+    <!-- 1. Clocks: Combined (three rings) or Separate (one picked clock) -->
     <section class="card hero" aria-labelledby="shared-title">
       <div class="card-head">
         <h2 id="shared-title" class="eyebrow"><span id="shared-label">Shared</span></h2>
-        <div class="seg" role="group" aria-label="Dial view">
-          <button type="button" data-view="one" aria-pressed="true">One dial</button>
+        <div class="seg" role="group" aria-label="Clock view">
+          <button type="button" data-view="combined" aria-pressed="true">Combined</button>
           <button type="button" data-view="separate" aria-pressed="false">Separate</button>
         </div>
       </div>
+      <div class="seg wide sep-only pick" role="group" aria-label="Clock to show">
+        <button type="button" data-pick="shared" aria-pressed="true">Ten</button>
+        <button type="button" data-pick="exact" aria-pressed="false">Meridian</button>
+        <button type="button" data-pick="regular" aria-pressed="false">Regular</button>
+      </div>
       <div class="hero-grid">
-        <figure class="dial-wrap one-only">
-          <svg id="combo" class="dial" viewBox="-200 -200 400 400" role="img" aria-label="One dial: outer ring Shared Ten, middle ring Meridian Ten, inner ring traditional 24-hour"></svg>
-          <figcaption class="legend" role="group" aria-label="Rings shown">
+        <figure class="dial-wrap">
+          <svg id="combo" class="dial one-only" viewBox="-200 -200 400 400" role="img" aria-label="Combined dial: outer ring Ten (Shared), middle ring Meridian Ten, inner ring Regular 12-hour"></svg>
+          <svg id="dial" class="dial sep-only pick-shared" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial. 0 at the top is sunset and the start of the new day."></svg>
+          <svg id="exact-dial" class="dial sep-only pick-exact" viewBox="-200 -200 400 400" role="img" aria-label="Meridian Ten dial for your own longitude, with your sunrise and sunset"></svg>
+          <svg id="analog" class="dial sep-only pick-regular" viewBox="-100 -100 200 200" role="img" aria-label="Regular clock, one turn per day: 12 PM at the top, 12 AM at the bottom, AM on the left, PM on the right"></svg>
+          <figcaption class="legend one-only" role="group" aria-label="Rings shown">
             <button type="button" class="ring-sw" data-ring="shared" aria-pressed="true"><i class="chip shared"></i>Ten (Shared)</button>
             <button type="button" class="ring-sw" data-ring="exact" aria-pressed="true"><i class="chip exact"></i>Meridian</button>
-            <button type="button" class="ring-sw" data-ring="regular" aria-pressed="true"><i class="chip regular"></i>24h</button>
+            <button type="button" class="ring-sw" data-ring="regular" aria-pressed="true"><i class="chip regular"></i>Regular</button>
           </figcaption>
-          <p class="note legend-note"><span class="sun-dot" aria-hidden="true"></span>sunrise <span class="sun-dot set" aria-hidden="true"></span>sunset <span class="zero-key" aria-hidden="true"></span>0 = 6 PM new day</p>
-        </figure>
-        <figure class="dial-wrap sep-only">
-          <svg id="dial" class="dial" viewBox="-200 -200 400 400" role="img" aria-labelledby="dial-desc">
-            <desc id="dial-desc">Ten-hour dial, 0 at the top is sunset and the start of the new day.</desc>
-          </svg>
+          <p class="note legend-note one-only"><span class="sun-dot" aria-hidden="true"></span>sunrise <span class="sun-dot set" aria-hidden="true"></span>sunset <span class="zero-key" aria-hidden="true"></span>0 = 6 PM new day</p>
         </figure>
         <div class="hero-read">
-          <p class="ten-big" id="shared-time" aria-hidden="true">0:00:00</p>
-          <p class="ten-date"><span id="shared-date">—</span></p>
-          <p class="note" id="shared-rollnote"></p>
-          <dl class="sun-list" id="sun-list">
-            <div><dt><span class="sun-dot" aria-hidden="true"></span>Sunrise</dt><dd id="sunrise">—</dd></div>
-            <div><dt><span class="sun-dot set" aria-hidden="true"></span>Sunset</dt><dd id="sunset">—</dd></div>
-          </dl>
-          <p class="note" id="sun-note"></p>
+          <!-- Combined: all three readouts -->
+          <div class="tri one-only">
+            <div class="tri-row shared"><span class="tri-name"><i class="chip shared"></i>Ten</span><span class="tri-time" id="c-shared">—</span><span class="tri-date" id="c-shared-date">—</span></div>
+            <div class="tri-row exact"><span class="tri-name"><i class="chip exact"></i>Meridian</span><span class="tri-time" id="c-exact">—</span><span class="tri-date" id="c-exact-date">—</span></div>
+            <div class="tri-row regular"><span class="tri-name"><i class="chip regular"></i>Regular</span><span class="tri-time" id="c-regular">—</span><span class="tri-date" id="c-regular-date">—</span></div>
+            <p class="note" id="c-note"></p>
+          </div>
+          <!-- Separate: the picked clock -->
+          <div class="sep-only sep-read">
+            <p class="ten-big" id="s-time" aria-hidden="true">—</p>
+            <p class="ampm" id="s-sub"></p>
+            <p class="ten-date" id="s-date">—</p>
+            <p class="note" id="s-note"></p>
+            <dl class="sun-list">
+              <div><dt><span class="sun-dot" aria-hidden="true"></span>Sunrise</dt><dd id="s-rise">—</dd></div>
+              <div><dt><span class="sun-dot set" aria-hidden="true"></span>Sunset</dt><dd id="s-set">—</dd></div>
+            </dl>
+          </div>
+          <p class="note sun-note" id="sun-note"></p>
+          <div class="fmt-row"><span class="note">Regular clock</span>
+            <div class="seg" role="group" aria-label="Hour format">
+              <button type="button" data-fmt="12" aria-pressed="true">12h</button>
+              <button type="button" data-fmt="24" aria-pressed="false">24h</button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -88,44 +108,11 @@
       <p class="note">Drag the slider or use the arrow keys. The other two bars follow to the same moment. Tap Now to go back to live time.</p>
     </section>
 
-    <!-- 2. Traditional (24-hour) -->
-    <section class="card trad" aria-labelledby="trad-title">
-      <div class="card-head">
-        <h2 id="trad-title" class="eyebrow">Traditional</h2>
-        <div class="seg" role="group" aria-label="Hour format">
-          <button type="button" data-fmt="12" aria-pressed="true">12h</button>
-          <button type="button" data-fmt="24" aria-pressed="false">24h</button>
-        </div>
-      </div>
-      <div class="trad-grid">
-        <svg id="analog" class="analog sep-only" viewBox="-100 -100 200 200" role="img" aria-label="Traditional clock, one turn per day: 12 PM at the top, 12 AM at the bottom, AM on the left, PM on the right"></svg>
-        <div class="trad-read">
-          <p class="trad-big"><span id="trad-time" aria-hidden="true">00:00:00</span></p>
-          <p class="ampm" id="trad-ampm">—</p>
-          <p class="ten-date" id="trad-date">—</p>
-          <p class="note" id="trad-sun"></p>
-          <p class="note" id="trad-12">—</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- 3. Ten Exact -->
-    <section class="card exact" aria-labelledby="exact-title">
-      <h2 id="exact-title" class="eyebrow">Ten Exact · your meridian</h2>
-      <div class="exact-grid">
-        <svg id="exact-dial" class="dial small sep-only" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial for your own meridian, with your sunrise and sunset"></svg>
-        <div class="exact-meta">
-          <p class="ten-mid" id="exact-time" aria-hidden="true">—</p>
-          <p id="exact-date" class="ten-date small">—</p>
-          <p id="exact-offset" class="note">—</p>
-          <p id="exact-true" class="note"></p>
-          <dl class="sun-list left">
-            <div><dt><span class="sun-dot" aria-hidden="true"></span>Sunrise</dt><dd id="ex-sunrise">—</dd></div>
-            <div><dt><span class="sun-dot set" aria-hidden="true"></span>Sunset</dt><dd id="ex-sunset">—</dd></div>
-          </dl>
-          <p class="note" id="ex-sun-note"></p>
-        </div>
-      </div>
+    <!-- Location (for Meridian and real sunrise/sunset) -->
+    <section class="card exact" aria-labelledby="loc-title">
+      <h2 id="loc-title" class="eyebrow">Your location · Meridian</h2>
+      <p class="note" id="exact-offset">—</p>
+      <p class="note" id="exact-true"></p>
       <div class="loc">
         <button type="button" id="geo-btn" class="btn">Set my location</button>
         <form id="loc-form" class="loc-form" autocomplete="off">

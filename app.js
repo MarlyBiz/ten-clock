@@ -36,7 +36,7 @@ const R_BAND = 172;
 const rot = (node, deg) => node.setAttribute('transform', `rotate(${deg.toFixed(3)})`);
 
 /** Ten 10-hour dial. Returns handles for hands and sun shading. */
-function buildTenDial(svg, { labels = true } = {}) {
+function buildTenDial(svg, { labels = true, track = true } = {}) {
   el('circle', { class: 'd-face', r: 196 }, svg);
   el('circle', { class: 'd-night', r: R_BAND }, svg);
   const dayArc = el('path', { class: 'd-day', d: '' }, svg);
@@ -58,7 +58,7 @@ function buildTenDial(svg, { labels = true } = {}) {
   const rise = el('circle', { class: 'd-sun', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
   const setS = el('circle', { class: 'd-sun set', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
   const hand = (cls, len, tail) => el('line', { class: `hand ${cls}`, x1: 0, y1: tail, x2: 0, y2: -len }, svg);
-  const sd = labels ? secTrack(svg, 189, 'shared', 7) : null;
+  const sd = track ? secTrack(svg, 189, 'shared', 7) : null;
   const h = hand('h', 78, 14), m = hand('m', 118, 18), s = hand('s', 150, 26);
   el('circle', { class: 'hub', r: 6 }, svg);
   return { dayArc, rise, set: setS, R: R_BAND,
@@ -130,7 +130,7 @@ function shade(d, a, b) {
 
 const mainDial = buildTenDial($('dial'));
 const tradDial = build24Dial($('analog'));
-const exactDial = buildTenDial($('exact-dial'), { labels: false });
+const exactDial = buildTenDial($('exact-dial'), { track: false }); // no seconds dot for Meridian
 
 /* ---------- formatting ---------- */
 const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
@@ -154,6 +154,7 @@ function dur(sec) {
 
 /* ---------- sun shading (recomputed when the date or location changes) ---------- */
 let sunKey = '';
+const SUN = { shared: { rise: '—', set: '—' }, exact: { rise: '—', set: '—' }, regular: { rise: '—', set: '—' }, note: '' };
 const sunPlace = (now) => {
   const approx = !(loc && Number.isFinite(loc.lat));
   return { lat: approx ? 40 : loc.lat, lon: loc ? loc.lon : T.zoneCentreLongitude(now), approx };
@@ -169,28 +170,24 @@ function updateSun(now, tenDate) {
   const note = p.approx
     ? `Approximate: estimated for your time zone (lat 40°, lon ${p.lon.toFixed(1)}°). Set your location for real sunrise and sunset.`
     : `Real sunrise and sunset at ${p.lat.toFixed(3)}°, ${p.lon.toFixed(3)}° (NOAA algorithm).`;
+  SUN.note = note;
   if (!s.sunrise || !s.sunset) {
     [mainDial, tradDial].forEach((d) => shade(d, null));
-    $('sunrise').textContent = '—'; $('sunset').textContent = '—';
-    $('sun-note').textContent = s.polar === 'day' ? 'Polar day: the sun does not set today.' : 'Polar night: the sun does not rise today.';
+    const pn = s.polar === 'day' ? 'Polar day: the sun does not set today.' : 'Polar night: the sun does not rise today.';
+    SUN.shared = SUN.regular = { rise: '—', set: '—' }; SUN.note = pn;
   } else {
     shade(mainDial, T.sharedTen(s.sunrise) / 100000, T.sharedTen(s.sunset) / 100000);
     shade(tradDial, turns24(T.localSecondsOfDay(s.sunrise)), turns24(T.localSecondsOfDay(s.sunset)));
-    $('sunrise').textContent = `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`;
-    $('sunset').textContent = `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}`;
-    $('sun-note').textContent = note;
-    $('trad-sun').textContent = `Sunrise ${tradHM(s.sunrise)} · Sunset ${tradHM(s.sunset)}${p.approx ? ' (approx.)' : ''}`;
+    SUN.shared = { rise: `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`, set: `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}` };
+    SUN.regular = { rise: tradHM(s.sunrise), set: tradHM(s.sunset) };
   }
   if (!se.sunrise || !se.sunset) {
     shade(exactDial, null);
-    $('ex-sunrise').textContent = '—'; $('ex-sunset').textContent = '—';
-    $('ex-sun-note').textContent = se.polar === 'day' ? 'Polar day.' : 'Polar night.';
+    SUN.exact = { rise: '—', set: '—' };
   } else {
     const er = T.exactTen(se.sunrise, p.lon), es = T.exactTen(se.sunset, p.lon);
     shade(exactDial, er / 100000, es / 100000);
-    $('ex-sunrise').textContent = `${tenHM(er)} · ${t12.format(se.sunrise)}`;
-    $('ex-sunset').textContent = `${tenHM(es)} · ${t12.format(se.sunset)}`;
-    $('ex-sun-note').textContent = p.approx ? 'Approximate (time-zone centre, lat 40°). Set your location for your real sun.' : 'Your real sunrise and sunset, in your meridian\'s Ten time.';
+    SUN.exact = { rise: `${tenHM(er)} · ${t12.format(se.sunrise)}`, set: `${tenHM(es)} · ${t12.format(se.sunset)}` };
   }
   sliderSun(s, se, p);
 }
@@ -234,7 +231,7 @@ function frame() {
   const exLon = loc ? loc.lon : T.zoneCentreLongitude(now);
   const ex = T.exactTen(now, exLon);
   exactDial.setHands(smooth ? ex : Math.floor(ex));
-  if (view === 'one') comboHands({ shared: smooth ? sh : Math.floor(sh), regular: smooth ? ls : Math.floor(ls), exact: smooth ? ex : Math.floor(ex) });
+  if (view === 'combined') comboHands({ shared: smooth ? sh : Math.floor(sh), regular: smooth ? ls : Math.floor(ls), exact: smooth ? ex : Math.floor(ex) });
 
   const sec = Math.floor(sh);
   if (sec !== lastSecond) { lastSecond = sec; slowUpdate(now, sh); }
@@ -243,40 +240,46 @@ function frame() {
 
 function slowUpdate(now, sh) {
   const shStr = T.formatTen(sh);
-  set('shared-time', shStr);
-  set('shared-label', `Shared · ${zone}${zoneShort(now) ? ` (${zoneShort(now)})` : ''}`);
+  const zl = `${zone}${zoneShort(now) ? ` (${zoneShort(now)})` : ''}`;
   const td = T.sharedTenDate(now);
-  set('shared-date', `Ten date: ${fmtYMD(td)}`);
-  set('shared-rollnote', td.rolled
-    ? 'New day began at sunset hour 0 (6 PM).'
-    : 'The new day begins at 0:00:00, which is 6 PM.');
   updateSun(now, td);
   sliderTick(now);
   sky(T.tenHourPosition(sh));
 
-  // traditional
+  // the three readings
+  const exLon = loc ? loc.lon : T.zoneCentreLongitude(now), approx = !loc;
+  const ex = T.exactTen(now, exLon), ed = T.exactTenDate(now, exLon);
   const h24 = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  const h12 = t12en.format(now).replace(/\u202f|\s/g, ' ');
-  set('trad-time', hourFmt === '24' ? h24 : h12);
-  set('trad-ampm', hourFmt === '24' ? h12 : `${h24} · 24-hour`);
-  set('trad-date', civilDateFmt.format(now));
-  set('trad-12', 'The calendar date changes at midnight (bottom of the dial).');
+  const h12s = t12en.format(now).replace(/\u202f|\s/g, ' ');
+  const regMain = hourFmt === '24' ? h24 : h12s, regSub = hourFmt === '24' ? h12s : `${h24} · 24-hour`;
+  const off = T.exactMinusSharedSeconds(now, exLon);
+  const offTxt = Math.abs(off) < 0.5 ? 'Same as Shared.'
+    : `${dur(off)} ${off < 0 ? 'behind' : 'ahead of'} Shared (${(Math.abs(off) / T.TEN_MINUTE_S).toFixed(1)} Ten-minutes)`;
+  const R = {
+    shared: { label: `Ten · Shared · ${zl}`, time: shStr, sub: '', date: `Ten date: ${fmtYMD(td)}`,
+      note: td.rolled ? 'New day began at sunset hour 0 (6 PM).' : 'The new day begins at 0:00:00, which is 6 PM.' },
+    exact: { label: `Meridian · lon ${exLon.toFixed(approx ? 1 : 3)}°${approx ? ' (approx.)' : ''}`, time: `${approx ? '≈' : ''}${T.formatTen(ex)}`,
+      sub: approx ? 'Approximate: your time-zone centre. Set your location below.' : offTxt, date: `Ten date: ${fmtYMD(ed)}`,
+      note: ed.rolled ? 'New day began at 0 (18:00 mean solar time here).' : 'Same longitude = same Meridian time, north or south.' },
+    regular: { label: `Regular · ${zl}`, time: regMain, sub: regSub, date: civilDateFmt.format(now), note: 'The calendar date changes at midnight.' },
+  };
+  // Combined
+  for (const k of ['shared', 'exact', 'regular']) { set(`c-${k}`, R[k].time); set(`c-${k}-date`, R[k].date); }
+  set('c-note', td.rolled ? 'Ten date changed at 6 PM (sunset hour 0); the regular date changes at midnight.' : 'Ten days start at 0 = 6 PM; regular days at midnight.');
+  // Separate (the picked clock)
+  const P = R[pick];
+  set('shared-label', view === 'combined' ? `Shared · ${zl}` : P.label);
+  set('s-time', P.time); set('s-sub', P.sub); set('s-date', P.date); set('s-note', P.note);
+  set('s-rise', SUN[pick].rise); set('s-set', SUN[pick].set);
+  set('sun-note', SUN.note);
 
-  // exact
+  // location card
   if (loc) {
-    const ex = T.exactTen(now, loc.lon);
-    set('exact-time', T.formatTen(ex));
-    set('exact-date', `Ten date: ${fmtYMD(T.exactTenDate(now, loc.lon))} · lon ${loc.lon.toFixed(3)}°`);
-    const d = T.exactMinusSharedSeconds(now, loc.lon);
-    set('exact-offset', Math.abs(d) < 0.5 ? 'Same as Shared.'
-      : `${dur(d)} ${d < 0 ? 'behind' : 'ahead of'} Shared (${(Math.abs(d) / T.TEN_MINUTE_S).toFixed(1)} Ten-minutes)`);
+    set('exact-offset', `Meridian ${T.formatTen(ex)} at lon ${loc.lon.toFixed(3)}°: ${offTxt}`);
     const app = T.apparentSolarSeconds(now, loc.lon);
     set('exact-true', `True sun (apparent solar): ${T.formatTen(T.tenFromSeconds(app))} · equation of time ${T.equationOfTime(now).toFixed(1)} min`);
   } else {
-    const lon = T.zoneCentreLongitude(now), ex = T.exactTen(now, lon);
-    set('exact-time', `≈${T.formatTen(ex)}`);
-    set('exact-date', `Approximate, for your time-zone centre (lon ${lon.toFixed(1)}°). Set your location below.`);
-    set('exact-offset', 'Same longitude = same Exact time, north or south.');
+    set('exact-offset', 'Set your location for your own Meridian time and real sunrise and sunset. Same longitude = same Meridian time, north or south.');
     set('exact-true', '');
   }
 
@@ -297,10 +300,13 @@ function slowUpdate(now, sh) {
 /* ---------- One dial: concentric rings (outer Shared Ten, middle 24h, inner Meridian) ---------- */
 const VIEW_KEY = 'ten.view.v1', RINGS_KEY = 'ten.rings.v1';
 const RING_ORDER = ['shared', 'exact', 'regular']; // outer -> inner
-let view = 'one';
+let view = 'combined';
+const PICK_KEY = 'ten.pick.v1';
+let pick = 'shared';
 let rings = { shared: true, regular: true, exact: true };
 try {
   if (localStorage.getItem(VIEW_KEY) === 'separate') view = 'separate';
+  const pk = localStorage.getItem(PICK_KEY); if (['shared', 'exact', 'regular'].includes(pk)) pick = pk;
   const r = JSON.parse(localStorage.getItem(RINGS_KEY));
   if (r && RING_ORDER.some((k) => r[k])) RING_ORDER.forEach((k) => { rings[k] = !!r[k]; });
 } catch { /* ignore */ }
@@ -393,10 +399,17 @@ function comboHands(v) {
 }
 
 function applyView() {
-  document.body.classList.toggle('view-one', view === 'one');
-  document.body.classList.toggle('view-sep', view !== 'one');
+  document.body.classList.toggle('view-one', view === 'combined');
+  document.body.classList.toggle('view-sep', view !== 'combined');
+  ['shared', 'exact', 'regular'].forEach((k) => document.body.classList.toggle(`pick-${k}`, pick === k));
   document.querySelectorAll('[data-view]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === view)));
+  document.querySelectorAll('[data-pick]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.pick === pick)));
+  lastSecond = -1; // refresh readouts now
 }
+document.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => {
+  pick = b.dataset.pick; try { localStorage.setItem(PICK_KEY, pick); } catch { /* ignore */ }
+  applyView();
+}));
 document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
   view = b.dataset.view; try { localStorage.setItem(VIEW_KEY, view); } catch { /* ignore */ }
   applyView();
