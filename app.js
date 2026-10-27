@@ -58,10 +58,26 @@ function buildTenDial(svg, { labels = true } = {}) {
   const rise = el('circle', { class: 'd-sun', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
   const setS = el('circle', { class: 'd-sun set', r: labels ? 7 : 9, cx: 0, cy: -R_BAND }, svg);
   const hand = (cls, len, tail) => el('line', { class: `hand ${cls}`, x1: 0, y1: tail, x2: 0, y2: -len }, svg);
+  const sd = labels ? secTrack(svg, 189, 'shared', 7) : null;
   const h = hand('h', 78, 14), m = hand('m', 118, 18), s = hand('s', 150, 26);
   el('circle', { class: 'hub', r: 6 }, svg);
   return { dayArc, rise, set: setS, R: R_BAND,
-    setHands(total) { rot(h, (total / 100000) * 360); rot(m, ((total % 10000) / 10000) * 360); rot(s, ((total % 100) / 100) * 360); } };
+    setHands(total) { rot(h, (total / 100000) * 360); rot(m, ((total % 10000) / 10000) * 360); rot(s, ((total % 100) / 100) * 360); if (sd) sd((total % 100) / 100); } };
+}
+
+/** Seconds track: a thin ring line, a progress arc from the top to the dot, and a big dot on the line. */
+function secTrack(parent, r, kind, dotR) {
+  const g = el('g', { class: `sec-track ${kind}` }, parent);
+  el('circle', { class: 'st-line', r }, g);
+  const arc = el('path', { class: 'st-fill', d: '' }, g);
+  const dot = el('circle', { class: 'st-dot', r: dotR, cx: 0, cy: -r }, g);
+  let lastD = '';
+  return (frac) => {
+    const f = T.mod(frac, 1), [x, y] = polar(r, f);
+    const d = f < 0.002 ? '' : `M0 ${-r}A${r} ${r} 0 ${f > 0.5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)}`;
+    if (d !== lastD) { arc.setAttribute('d', d); lastD = d; }
+    dot.setAttribute('cx', x.toFixed(2)); dot.setAttribute('cy', y.toFixed(2));
+  };
 }
 
 /** AM/PM half-ring tints for a noon-at-top traditional dial (PM = right half, AM = left half). */
@@ -96,10 +112,10 @@ function build24Dial(svg) {
   const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
   const hand = (cls, len) => el('line', { class: `hand ${cls}`, x1: 0, y1: 8, x2: 0, y2: -len }, svg);
   const h = hand('ah', 44), m = hand('am', 70), s = hand('as', 80);
-  const sd = el('g', { class: 'c-sec regular' }, svg); el('circle', { cx: 0, cy: -95, r: 2.6 }, sd);
+  const sd = secTrack(svg, 95, 'regular', 4);
   el('circle', { class: 'hub', r: 3.5 }, svg);
   return { dayArc, rise, set: setS, R: R24,
-    setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); rot(sd, ((sec % 60) / 60) * 360); } };
+    setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); sd((sec % 60) / 60); } };
 }
 
 /** Shade a dial's day arc and place sun markers; a, b in turns (0 = top, clockwise). */
@@ -340,7 +356,7 @@ function buildCombo() {
     const set = el('circle', { class: 'd-sun set', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
     comboParts.sun[k] = { dayArc, rise, set, R: rS };
     comboParts.hands[k] = T.ringHand(bands[i], i === on.length - 1);
-    if (k === 'regular') comboParts.regR = rO - 3.5;
+    comboParts.rIn = comboParts.rIn || {}; comboParts.rIn[k] = bands[i].rInner;
   });
   // hands on top, outer ring's (Shared) drawn last so it is most prominent
   [...on].reverse().forEach((k) => {
@@ -350,14 +366,10 @@ function buildCombo() {
     el('circle', { cx: 0, cy: -r2, r: k === 'shared' ? 5 : 4 }, gh);
     comboParts.hands[k].g = gh;
   });
-  if (rings.shared) { // smooth Ten-second sweep dot on the outer edge
-    comboParts.sec = el('g', { class: 'c-sec' }, combo);
-    el('circle', { cx: 0, cy: -192, r: 3.2 }, comboParts.sec);
-  }
-  if (rings.regular) { // blue seconds dot: one lap per 60 SI seconds
-    comboParts.secReg = el('g', { class: 'c-sec regular' }, combo);
-    el('circle', { cx: 0, cy: -comboParts.regR, r: 3 }, comboParts.secReg);
-  }
+  // seconds tracks on the inner edge of their ring (clear of the sun dots and the 6 PM diamond)
+  const dotR = () => 7;
+  if (rings.shared) comboParts.sec = secTrack(combo, comboParts.rIn.shared + 5, 'shared', dotR('shared'));
+  if (rings.regular) comboParts.secReg = secTrack(combo, comboParts.rIn.regular + 5, 'regular', 5.5);
   el('circle', { class: 'hub', r: 6 }, combo);
   document.querySelectorAll('.ring-sw').forEach((b) => b.setAttribute('aria-pressed', String(rings[b.dataset.ring])));
   paintComboSun();
@@ -376,8 +388,8 @@ function paintComboSun() {
 
 function comboHands(v) {
   for (const [k, h] of Object.entries(comboParts.hands)) if (h.g) rot(h.g, toTurns[k](v[k]) * 360);
-  if (comboParts.sec) rot(comboParts.sec, ((v.shared % 100) / 100) * 360);
-  if (comboParts.secReg) rot(comboParts.secReg, ((v.regular % 60) / 60) * 360);
+  if (comboParts.sec) comboParts.sec((v.shared % 100) / 100);
+  if (comboParts.secReg) comboParts.secReg((v.regular % 60) / 60);
 }
 
 function applyView() {

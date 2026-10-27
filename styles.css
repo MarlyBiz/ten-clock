@@ -202,7 +202,6 @@ b { font-weight: 600; }
 .c-hand.shared line { stroke: #ffb86b; stroke-width: 6; } .c-hand.shared circle { fill: #ffb86b; }
 .c-hand.regular line { stroke: #8fb8ff; stroke-width: 4; } .c-hand.regular circle { fill: #8fb8ff; }
 .c-hand.exact line { stroke: #7ee0b5; stroke-width: 3.5; } .c-hand.exact circle { fill: #7ee0b5; }
-.c-sec circle { fill: #fff; }
 .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
 .ring-sw { font: inherit; font-size: .85rem; color: var(--ink); background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
 .ring-sw[aria-pressed="false"] { color: var(--mute); opacity: .6; text-decoration: line-through; }
@@ -220,4 +219,12 @@ b { font-weight: 600; }
 .half-am { stroke: rgba(143,184,255,.15); }
 .r-ampm.pm, .a-ampm.pm { fill: #ffcf99; } .r-ampm.am, .a-ampm.am { fill: #b9d2ff; }
 .a-ampm { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-anchor: middle; dominant-baseline: central; }
-.c-sec.regular circle { fill: #8fb8ff; filter: drop-shadow(0 0 2px #8fb8ff); }
+/* Seconds tracks */
+.st-line { fill: none; stroke: rgba(255,255,255,.14); stroke-width: 1.6; }
+.st-fill { fill: none; stroke-width: 3.2; stroke-linecap: round; }
+.st-dot { stroke: #0b1230; stroke-width: 1.6; }
+.sec-track.shared .st-fill { stroke: #ffd9a8; stroke-opacity: .8; }
+.sec-track.shared .st-dot { fill: #fff; filter: drop-shadow(0 0 3px rgba(255,217,168,.9)); }
+.sec-track.regular .st-line { stroke: rgba(143,184,255,.22); }
+.sec-track.regular .st-fill { stroke: #8fb8ff; stroke-opacity: .85; }
+.sec-track.regular .st-dot { fill: #8fb8ff; filter: drop-shadow(0 0 3px #8fb8ff); }
