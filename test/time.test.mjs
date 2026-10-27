@@ -206,18 +206,39 @@ test('Solar noon lies between sunrise and sunset (Walled Lake)', () => {
   assert.ok(Math.abs(sc.x) < 0.35, `sun near centre at noon (x=${sc.x})`);
 });
 
-test('Moon tonight (Walled Lake) is up and on-screen, not clamped to the edge', () => {
-  // 2026-10-26 evening: near-full moon rising in the east for Walled Lake, MI
+test('Moon tonight (Walled Lake) rides the arch; waning after full', () => {
   const nine = T.skyScene(new Date('2026-10-27T01:00:00Z'), 42.538, -83.481); // 9 PM EDT
+  const elev = T.skyScene(new Date('2026-10-27T03:00:00Z'), 42.538, -83.481); // 11 PM EDT
   const mid = T.skyScene(new Date('2026-10-27T04:00:00Z'), 42.538, -83.481); // midnight
   assert.ok(nine.moon.alt > 15, `9 PM moon alt ${nine.moon.alt}`);
   assert.ok(nine.moon.frac > 0.9, `near full frac ${nine.moon.frac}`);
-  assert.ok(nine.mx >= -1 && nine.mx <= 1, `9 PM moon on-screen mx=${nine.mx}`);
-  assert.ok(nine.my > 0.2, `9 PM moon above horizon my=${nine.my}`);
-  assert.ok(mid.moon.alt > 40, `midnight moon alt ${mid.moon.alt}`);
-  assert.ok(mid.my > 0.7, `midnight moon high my=${mid.my}`);
-  // Moon in the east at 9 PM → same framing as sun → right of centre
-  assert.ok(nine.mx > 0.2, `9 PM moon on the right mx=${nine.mx}`);
+  assert.ok(!nine.moon.waxing, 'just past full → waning');
+  assert.ok(nine.moon.phase > 0.5, `waning phase ${nine.moon.phase}`);
+  // On unit semi-ellipse: x² + y² ≈ 1 while above horizon
+  const onArch = (sc, label) => {
+    const r2 = sc.mx * sc.mx + sc.my * sc.my;
+    assert.ok(Math.abs(r2 - 1) < 0.08, `${label} on arch r²=${r2}`);
+    assert.ok(sc.mx > -1 && sc.mx < 1, `${label} inset mx=${sc.mx}`);
+  };
+  onArch(nine, '9 PM');
+  onArch(elev, '11 PM');
+  onArch(mid, 'midnight');
+  assert.ok(nine.mx > elev.mx, `moon moves leftward along arch 9→11 (${nine.mx}→${elev.mx})`);
+  assert.ok(mid.my > 0.7, `midnight moon near peak my=${mid.my}`);
+});
+
+test('Sun arch: morning right, noon peak, afternoon left; never at the rim', () => {
+  const morn = T.skyScene(new Date('2026-06-21T14:00:00Z'), 42.538, -83.481); // 10 AM EDT
+  const noon = T.skyScene(new Date('2026-06-21T17:36:00Z'), 42.538, -83.481);
+  const aft = T.skyScene(new Date('2026-06-21T21:00:00Z'), 42.538, -83.481); // 5 PM EDT
+  assert.ok(morn.x > 0.25 && morn.x < 0.98, `10 AM x=${morn.x}`);
+  assert.ok(Math.abs(noon.x) < 0.2, `noon x=${noon.x}`);
+  assert.ok(noon.y > 0.95, `noon y=${noon.y}`);
+  assert.ok(aft.x < -0.25 && aft.x > -0.98, `5 PM x=${aft.x}`);
+  for (const [sc, lab] of [[morn,'morn'],[noon,'noon'],[aft,'aft']]) {
+    const r2 = sc.x * sc.x + sc.y * sc.y;
+    assert.ok(Math.abs(r2 - 1) < 0.08, `${lab} on arch r²=${r2}`);
+  }
 });
 
 test('New moon has near-zero illumination (glow-only draw path)', () => {

@@ -265,31 +265,136 @@ export function moonPosition(date, latDeg, lonDeg) {
   const az = mod(Math.atan2(Math.sin(ha), Math.cos(ha) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat)) * TO_DEG + 180, 360);
   const synodic = 29.530588853, age = mod(jd - 2451550.1, synodic);
   const frac = (1 - Math.cos((age / synodic) * 2 * Math.PI)) / 2;
-  return { alt, az, frac, waxing: age < synodic / 2, age };
+  const phase = age / synodic; // 0 new … 0.5 full … 1 new
+  return { alt, az, frac, waxing: age < synodic / 2, age, phase };
+}
+
+/** Synodic phase 0..1 (0=new, 0.5=full) from moon age. */
+export const moonPhase01 = (moon) => mod(moon.age / 29.530588853, 1);
+
+/**
+ * Approximate moonrise / moonset bracketing `date` (alt crosses 0°).
+ * Returns { rise, set } as Dates (null if none in ±18 h — polar).
+ */
+export function moonTimes(date, latDeg, lonDeg) {
+  const tMid = date.getTime();
+  const step = 12 * 60e3; // 12 min
+  const t0 = tMid - 18 * 3600e3;
+  const t1 = tMid + 18 * 3600e3;
+  const altAt = (ms) => moonPosition(new Date(ms), latDeg, lonDeg).alt;
+  const refine = (a, b, rising) => {
+    let lo = a, hi = b;
+    for (let i = 0; i < 18; i++) {
+      const mid = (lo + hi) / 2;
+      const up = altAt(mid) >= 0;
+      if (rising ? up : !up) hi = mid; else lo = mid;
+    }
+    return new Date((lo + hi) / 2);
+  };
+  let prevT = t0, prevA = altAt(t0);
+  let rise = null, set = null;
+  // Prefer the pair that brackets `date` when the moon is up; else nearest upcoming/past.
+  let riseBefore = null, setAfter = null, riseAfter = null, setBefore = null;
+  for (let t = t0 + step; t <= t1; t += step) {
+    const a = altAt(t);
+    if (prevA < 0 && a >= 0) {
+      const r = refine(prevT, t, true);
+      if (r.getTime() <= tMid) riseBefore = r; else if (!riseAfter) riseAfter = r;
+    }
+    if (prevA >= 0 && a < 0) {
+      const s = refine(prevT, t, false);
+      if (s.getTime() >= tMid) { if (!setAfter) setAfter = s; }
+      else setBefore = s;
+    }
+    prevT = t; prevA = a;
+  }
+  if (riseBefore && setAfter) { rise = riseBefore; set = setAfter; }
+  else if (riseAfter && setAfter && riseAfter < setAfter) { rise = riseAfter; set = setAfter; }
+  else if (riseBefore && setBefore) { rise = riseBefore; set = setBefore; }
+  else { rise = riseBefore || riseAfter; set = setAfter || setBefore; }
+  return { rise, set };
 }
 
 /**
- * Sky scene for the animated background. Camera faces the sun.
- * x/y: sun on screen (−1 left … +1 right; y 0 = horizon mid-dial, 1 = top).
- * Morning sun is to the right of center; after noon it flips to the left (viewer turned).
- * Southern hemisphere is mirrored so the same cinematic rule holds.
+ * Unit-arch position for a rise→set fraction u (0 at rise, 1 at set).
+ * Northern: morning-right (rise +x, set −x). Southern: mirrored.
+ * y = sin(πu) so the path is a perfect semi-ellipse in (x,y).
+ */
+export function archPoint(u, southHem) {
+  const uu = Math.max(0, Math.min(1, u));
+  let x = Math.cos(uu * Math.PI); // +1 rise … 0 transit … −1 set
+  let y = Math.sin(uu * Math.PI); // 0 … 1 … 0
+  if (southHem) x = -x;
+  if (u < 0 || u > 1) {
+    // Below horizon: park just under the nearer end (still inset when mapped)
+    const end = u < 0 ? 1 : -1; // before rise → rise side (+1 N)
+    x = southHem ? -end : end;
+    y = -Math.min(0.35, 0.15 + 0.2 * Math.min(Math.abs(u < 0 ? u : u - 1), 1));
+  }
+  return { x, y };
+}
+
+/** Fraction of time above the horizon; <0 before rise, >1 after set. */
+function archFraction(date, rise, set) {
+  if (!rise || !set) return null;
+  const r = rise.getTime(), s = set.getTime();
+  if (!(s > r)) return null;
+  return (date.getTime() - r) / (s - r);
+}
+
+/**
+ * Sky scene for the animated background.
+ * Sun and moon share one perfect semi-ellipse arch (simulation, not az plot):
+ * x −1..+1, y 0 at horizon … 1 at peak. Morning-right / afternoon-left (N); S mirrored.
  */
 export function skyScene(date, latDeg, lonDeg) {
   const sun = sunPosition(date, latDeg, lonDeg);
   const moon = moonPosition(date, latDeg, lonDeg);
   const southHem = latDeg < 0;
-  const maxAlt = Math.max(8, 90 - Math.abs(latDeg - 23.44 * Math.sin(2 * Math.PI * (julianDate(date) - 2451545) / 365.25)));
-  const meridianAz = southHem ? 0 : 180;
-  const dAz = mod(sun.az - meridianAz + 180, 360) - 180;
-  // N hem: east of south → negative dAz → morning should be RIGHT → use −dAz
-  const morningRight = southHem ? dAz : -dAz;
-  const x = Math.max(-1, Math.min(1, morningRight / 90));
-  const y = sun.alt <= 0 ? Math.max(-0.6, sun.alt / 18) : Math.min(1, sun.alt / maxAlt);
-  // Moon uses the SAME screen arc as the sun (own azimuth vs meridian), not offset-from-sun
-  // (offset-from-sun shoved the moon off-screen whenever it was far from the sun in azimuth).
-  let mDAz = mod(moon.az - meridianAz + 180, 360) - 180;
-  const mMorningRight = southHem ? mDAz : -mDAz;
-  const mx = Math.max(-1, Math.min(1, mMorningRight / 90));
-  const my = moon.alt <= 0 ? Math.max(-0.6, moon.alt / 18) : Math.min(1, moon.alt / maxAlt);
-  return { sun, moon, x, y, mx, my, facing: sun.az, southHem, maxAlt };
+  const ymd = [date.getFullYear(), date.getMonth() + 1, date.getDate()];
+  // Local calendar day for NOAA sun times (zone of the Date object's local fields —
+  // tests set TZ=America/Detroit; in-browser uses the device zone).
+  let st = sunTimes(ymd[0], ymd[1], ymd[2], latDeg, lonDeg);
+  // If after local midnight but before sunrise, yesterday's set may be the relevant "down" side;
+  // for the arch while up we need today's rise/set. If sun is up but outside today's window
+  // (DST edge), pull neighbouring day.
+  if (st.sunrise && st.sunset) {
+    if (date < st.sunrise) {
+      const prev = new Date(date.getTime() - 86400000);
+      const pst = sunTimes(prev.getFullYear(), prev.getMonth() + 1, prev.getDate(), latDeg, lonDeg);
+      if (pst.sunset && date < pst.sunset && date > pst.sunrise) st = pst;
+    } else if (date > st.sunset) {
+      const next = new Date(date.getTime() + 86400000);
+      const nst = sunTimes(next.getFullYear(), next.getMonth() + 1, next.getDate(), latDeg, lonDeg);
+      if (nst.sunrise && date > nst.sunrise && date < nst.sunset) st = nst;
+    }
+  }
+  let su = archFraction(date, st.sunrise, st.sunset);
+  if (su == null) {
+    // Polar / missing: fall back to altitude + crude morning-right from azimuth
+    const meridianAz = southHem ? 0 : 180;
+    const dAz = mod(sun.az - meridianAz + 180, 360) - 180;
+    const morningRight = southHem ? dAz : -dAz;
+    su = sun.alt > 0 ? (1 - morningRight / 90) / 2 : (sun.alt > -6 ? -0.05 : 1.05);
+  }
+  const sp = archPoint(su, southHem);
+
+  const mt = moonTimes(date, latDeg, lonDeg);
+  let mu = archFraction(date, mt.rise, mt.set);
+  if (mu == null) {
+    const meridianAz = southHem ? 0 : 180;
+    const dAz = mod(moon.az - meridianAz + 180, 360) - 180;
+    const morningRight = southHem ? dAz : -dAz;
+    mu = moon.alt > 0 ? (1 - morningRight / 90) / 2 : (moon.alt > -6 ? -0.05 : 1.05);
+  }
+  const mp = archPoint(mu, southHem);
+
+  return {
+    sun, moon,
+    x: sp.x, y: sp.y, mx: mp.x, my: mp.y,
+    su, mu,
+    sunRise: st.sunrise, sunSet: st.sunset,
+    moonRise: mt.rise, moonSet: mt.set,
+    facing: sun.az, southHem,
+  };
 }

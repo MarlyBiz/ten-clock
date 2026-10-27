@@ -433,6 +433,12 @@ applyView();
 
 /* ---------- Animated sky (sun/moon/compass/stars/clouds); follows slider instant ---------- */
 const skyCv = $('sky'), skyCtx = skyCv.getContext('2d', { alpha: false });
+const moonImg = new Image();
+moonImg.decoding = 'async';
+moonImg.src = 'assets/sky/moon.png';
+let moonImgReady = false;
+moonImg.onload = () => { moonImgReady = true; lastSky = 0; };
+
 const reduceSky = matchMedia('(prefers-reduced-motion: reduce)');
 const stars = Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.55, r: Math.random() * 1.2 + 0.3, p: Math.random() * Math.PI * 2 }));
 const clouds = Array.from({ length: 5 }, (_, i) => ({ x: Math.random(), y: 0.12 + i * 0.06, s: 0.35 + Math.random() * 0.4, v: 0.003 + Math.random() * 0.004 }));
@@ -453,16 +459,13 @@ function resizeSky() {
 /** Dial midline (horizon) and peak Y in the clear band above the first card. */
 function skyLayout() {
   const hero = document.querySelector('.card.hero');
-  const dial = document.body.classList.contains('view-sep')
-    ? ($(pick === 'regular' ? 'analog' : pick === 'exact' ? 'exact-dial' : 'dial') || $('combo'))
-    : ($('combo') || document.querySelector('.dial'));
   const vh = window.visualViewport?.height || skyH;
   const cardTop = hero ? Math.max(0, hero.getBoundingClientRect().top) : 100;
-  // Peak in the clear gap above the first card (aim ~half of that band, clamped)
-  const band = Math.max(48, cardTop);
-  const peakY = Math.max(16, Math.min(band - 12, band * 0.52));
-  let hy = dial ? (dial.getBoundingClientRect().top + dial.getBoundingClientRect().height / 2) : (cardTop + 200);
-  if (!(hy > peakY + 40)) hy = peakY + Math.min(280, vh * 0.42);
+  // Simulation arch lives entirely in the clear top band so sun/moon are never
+  // trapped behind frosted cards. Peak near the top; horizon just above the card.
+  const band = Math.max(56, cardTop);
+  const peakY = Math.max(18, Math.min(band * 0.42, band - 36));
+  const hy = Math.max(peakY + 40, cardTop - 6); // arch feet just above / at card top
   return { hy, peakY, cardTop, band };
 }
 function skyColors(alt) {
@@ -477,38 +480,112 @@ const mix3 = (a, b, t) => a.map((c, i) => {
   const A = parse(c), B = parse(b[i]);
   return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * t).toString(16).padStart(2, '0')).join('');
 });
-function drawMoon(ctx, x, y, r, frac, waxing) {
-  // Soft outer glow (always — especially important near new moon)
-  const glow = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 3.2);
-  glow.addColorStop(0, 'rgba(230,240,255,.55)');
-  glow.addColorStop(0.35, 'rgba(180,200,255,.22)');
+/** Heaven-on-Earth lit-path (SVG A arcs) — waxing lit RIGHT, waning lit LEFT (N hem). */
+function moonLitPathD(phase, illuminated, R, cx, cy) {
+  const f = Math.max(0, Math.min(1, illuminated));
+  if (f >= 0.985) return `M ${cx} ${cy - R} A ${R} ${R} 0 1 1 ${cx - 0.01} ${cy - R} Z`;
+  if (f <= 0.015) return '';
+  const isWaxing = phase <= 0.5;
+  const rx = Math.max(0.1, R * Math.abs(2 * f - 1));
+  const topY = cy - R, botY = cy + R;
+  if (isWaxing) {
+    const sweepT = f < 0.5 ? 0 : 1;
+    return `M ${cx} ${topY} A ${R} ${R} 0 0 1 ${cx} ${botY} A ${rx} ${R} 0 0 ${sweepT} ${cx} ${topY} Z`;
+  }
+  const sweepT = f < 0.5 ? 1 : 0;
+  return `M ${cx} ${topY} A ${R} ${R} 0 0 0 ${cx} ${botY} A ${rx} ${R} 0 0 ${sweepT} ${cx} ${topY} Z`;
+}
+function drawMoon(ctx, x, y, r, frac, phase, southHem) {
+  // Soft outer glow
+  const glow = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 3.0);
+  glow.addColorStop(0, 'rgba(215,235,255,.45)');
+  glow.addColorStop(0.4, 'rgba(180,215,255,.14)');
   glow.addColorStop(1, 'rgba(140,170,255,0)');
-  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 3.0, 0, Math.PI * 2); ctx.fill();
+
   if (frac < 0.06) {
-    // Obvious new-moon glow ring — clearly visible day or night, no bright disk
-    const g2 = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2.8);
-    g2.addColorStop(0, 'rgba(210,225,255,.15)');
-    g2.addColorStop(0.45, 'rgba(190,210,255,.45)');
-    g2.addColorStop(0.7, 'rgba(170,195,255,.35)');
+    // Obvious new-moon glow ring — no bright disk
+    const g2 = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 2.6);
+    g2.addColorStop(0, 'rgba(210,225,255,.12)');
+    g2.addColorStop(0.45, 'rgba(190,210,255,.5)');
+    g2.addColorStop(0.75, 'rgba(170,195,255,.32)');
     g2.addColorStop(1, 'rgba(140,170,255,0)');
-    ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(x, y, r * 2.8, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(230,240,255,.85)'; ctx.lineWidth = Math.max(3, r * 0.22); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x, y, r * 1.45, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(180,205,255,.45)'; ctx.lineWidth = Math.max(2, r * 0.12); ctx.stroke();
+    ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r * 1.06, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(230,240,255,.88)'; ctx.lineWidth = Math.max(3, r * 0.22); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 1.4, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(180,205,255,.42)'; ctx.lineWidth = Math.max(2, r * 0.12); ctx.stroke();
     return;
   }
+
+  // Southern hemisphere: mirror waxing/waning side
+  const phaseDraw = southHem ? (phase + 0.5) % 1 : phase;
+  const litD = moonLitPathD(phaseDraw, frac, r, x, y);
+
   ctx.save();
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#f2f6ff'; ctx.fill();
-  if (frac < 0.995) {
-    const phase = (waxing ? 1 : -1) * (1 - 2 * frac);
-    ctx.beginPath(); ctx.arc(x + phase * r, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(8,12,32,.92)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+  // A. Earthshine base
+  ctx.fillStyle = '#141a24'; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  if (moonImgReady) {
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(moonImg, x - r, y - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.2; ctx.stroke();
+
+  // B. Illuminated portion with soft terminator
+  if (litD) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+    const lit = new Path2D(litD);
+    ctx.clip(lit);
+    if (moonImgReady) {
+      ctx.drawImage(moonImg, x - r, y - r, r * 2, r * 2);
+      ctx.fillStyle = 'rgba(255,255,255,.08)';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    } else {
+      ctx.fillStyle = '#f2f6ff';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // C. Soft limb
+  ctx.beginPath(); ctx.arc(x, y, r - 0.3, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 0.8; ctx.stroke();
+}
+function drawSun(ctx, x, y, R, alt) {
+  const golden = alt > 0 && alt < 8;
+  const corona = ctx.createRadialGradient(x, y, R * 0.2, x, y, R * 3.2);
+  if (golden) {
+    corona.addColorStop(0, 'rgba(255,185,75,.55)');
+    corona.addColorStop(0.45, 'rgba(255,140,30,.22)');
+    corona.addColorStop(0.72, 'rgba(255,140,30,0)');
+  } else {
+    corona.addColorStop(0, 'rgba(255,252,225,.65)');
+    corona.addColorStop(0.45, 'rgba(255,230,130,.25)');
+    corona.addColorStop(0.72, 'rgba(255,230,130,0)');
+  }
+  ctx.fillStyle = corona; ctx.beginPath(); ctx.arc(x, y, R * 3.2, 0, Math.PI * 2); ctx.fill();
+  if (golden) {
+    const flare = ctx.createLinearGradient(x - R * 2.2, y, x + R * 2.2, y);
+    flare.addColorStop(0, 'rgba(255,160,50,0)');
+    flare.addColorStop(0.3, 'rgba(255,160,50,.55)');
+    flare.addColorStop(0.5, 'rgba(255,245,215,.85)');
+    flare.addColorStop(0.7, 'rgba(255,160,50,.55)');
+    flare.addColorStop(1, 'rgba(255,160,50,0)');
+    ctx.fillStyle = flare;
+    ctx.fillRect(x - R * 2.2, y - 1.2, R * 4.4, 2.4);
+  }
+  const disc = ctx.createRadialGradient(x - R * 0.25, y - R * 0.25, R * 0.1, x, y, R);
+  if (golden) {
+    disc.addColorStop(0, '#fffdf4'); disc.addColorStop(0.45, '#ffe082');
+    disc.addColorStop(0.8, '#ff9800'); disc.addColorStop(1, '#f57c00');
+  } else {
+    disc.addColorStop(0, '#ffffff'); disc.addColorStop(0.45, '#fffff5');
+    disc.addColorStop(0.75, '#fff9e6'); disc.addColorStop(1, '#ffe082');
+  }
+  ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
 }
 function paintSky(date, force = false) {
   const now = performance.now();
@@ -551,31 +628,28 @@ function paintSky(date, force = false) {
     skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.72, peakY * 0.55, 52, 14, 0, 0, Math.PI * 2); skyCtx.fill();
   }
 
-  // map scene x/y → pixels: y=0 at dial midline (horizon), y=1 at peak in the clear top band
-  const spanX = Math.min(skyW * 0.42, 220);
-  const spanY = Math.max(60, hy - peakY);
-  const sx = cx + sc.x * spanX, sy = hy - sc.y * spanY;
-  const mx = cx + sc.mx * spanX, my = hy - sc.my * spanY;
+  // One perfect semi-ellipse arch, inset ~11% from screen edges; peak in clear top band.
+  // Scene x/y already lie on the unit semi-ellipse (simulation, not azimuth plot).
+  const margin = Math.max(28, skyW * 0.11);
+  const rx = (skyW - 2 * margin) / 2;
+  const ry = Math.max(56, hy - peakY);
+  const toPx = (nx, ny) => ({ px: cx + nx * rx, py: hy - ny * ry });
+  const sP = toPx(sc.x, sc.y), mP = toPx(sc.mx, sc.my);
+  const sx = sP.px, sy = sP.py, mx = mP.px, my = mP.py;
 
-  // moon on the same arc as the sun (rise→peak in top band→set); drawn after stars/clouds, before sun
+  // moon on the same arch as the sun
   if (sc.moon.alt > -6) {
-    const mr = sc.sun.alt < 0 ? 22 : 18; // roughly sun-sized
-    // Daytime: still clearly visible when up; night: full brightness
-    const a = sc.sun.alt < -3 ? 1 : sc.sun.alt < 5 ? 0.9 : 0.75;
+    const mr = Math.max(16, Math.min(26, skyW * 0.048));
+    const a = sc.sun.alt < -3 ? 1 : sc.sun.alt < 5 ? 0.92 : 0.78;
     skyCtx.globalAlpha = a;
-    drawMoon(skyCtx, mx, my, mr, sc.moon.frac, sc.moon.waxing);
+    drawMoon(skyCtx, mx, my, mr, sc.moon.frac, sc.moon.phase, sc.southHem);
     skyCtx.globalAlpha = 1;
   }
 
-  // sun always drawn (even "gloomy")
+  // sun — Heaven-style radiant disc
   if (sc.sun.alt > -12) {
-    const R = 22;
-    const glow = skyCtx.createRadialGradient(sx, sy, 2, sx, sy, R * 3);
-    glow.addColorStop(0, 'rgba(255,240,180,.95)');
-    glow.addColorStop(0.35, 'rgba(255,180,80,.45)');
-    glow.addColorStop(1, 'rgba(255,140,40,0)');
-    skyCtx.fillStyle = glow; skyCtx.beginPath(); skyCtx.arc(sx, sy, R * 3, 0, Math.PI * 2); skyCtx.fill();
-    skyCtx.fillStyle = '#fff6c8'; skyCtx.beginPath(); skyCtx.arc(sx, sy, R, 0, Math.PI * 2); skyCtx.fill();
+    const R = Math.max(16, Math.min(26, skyW * 0.048));
+    drawSun(skyCtx, sx, sy, R, sc.sun.alt);
   }
 
   // Soft ground veil: hide sun/moon below the horizon without killing the sky colour lower down the page
