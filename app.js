@@ -450,10 +450,20 @@ function resizeSky() {
   skyCv.style.width = skyW + 'px'; skyCv.style.height = skyH + 'px';
   skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-function horizonY() {
-  // Fixed in the viewport (not the dial's scrolled position), so the sky never goes pitch-black as you scroll.
+/** Dial midline (horizon) and peak Y in the clear band above the first card. */
+function skyLayout() {
+  const hero = document.querySelector('.card.hero');
+  const dial = document.body.classList.contains('view-sep')
+    ? ($(pick === 'regular' ? 'analog' : pick === 'exact' ? 'exact-dial' : 'dial') || $('combo'))
+    : ($('combo') || document.querySelector('.dial'));
   const vh = window.visualViewport?.height || skyH;
-  return vh * 0.40;
+  const cardTop = hero ? Math.max(0, hero.getBoundingClientRect().top) : 100;
+  // Peak in the clear gap above the first card (aim ~half of that band, clamped)
+  const band = Math.max(48, cardTop);
+  const peakY = Math.max(16, Math.min(band - 12, band * 0.52));
+  let hy = dial ? (dial.getBoundingClientRect().top + dial.getBoundingClientRect().height / 2) : (cardTop + 200);
+  if (!(hy > peakY + 40)) hy = peakY + Math.min(280, vh * 0.42);
+  return { hy, peakY, cardTop, band };
 }
 function skyColors(alt) {
   // alt in degrees; blend dawn/day/sunset/night
@@ -490,13 +500,14 @@ function paintSky(date, force = false) {
   lastSky = now;
   if (!skyW) resizeSky();
   const sc = skyPlace(date);
-  const hy = horizonY(), cx = skyW / 2;
+  const { hy, peakY } = skyLayout();
+  const cx = skyW / 2;
   const cols = skyColors(sc.sun.alt);
   const g = skyCtx.createLinearGradient(0, 0, 0, skyH);
-  g.addColorStop(0, cols[0]); g.addColorStop(Math.max(0.15, Math.min(0.7, hy / skyH)), cols[1]); g.addColorStop(1, cols[2]);
+  g.addColorStop(0, cols[0]); g.addColorStop(Math.max(0.12, Math.min(0.55, peakY / skyH)), cols[1]); g.addColorStop(Math.max(0.35, Math.min(0.75, hy / skyH)), cols[1]); g.addColorStop(1, cols[2]);
   skyCtx.fillStyle = g; skyCtx.fillRect(0, 0, skyW, skyH);
 
-  // stars (night / twilight)
+  // stars in the upper sky (incl. the clear band above the card)
   const night = Math.max(0, Math.min(1, (-sc.sun.alt) / 12));
   if (night > 0.05) {
     for (const s of stars) {
@@ -506,27 +517,27 @@ function paintSky(date, force = false) {
     }
   }
 
-  // decorative daytime clouds
+  // decorative daytime clouds — prefer the clear top band so they aren't trapped behind the card
   if (sc.sun.alt > -2 && !reduceSky.matches) {
-    skyCtx.fillStyle = 'rgba(255,255,255,.12)';
+    skyCtx.fillStyle = 'rgba(255,255,255,.14)';
     for (const c of clouds) {
       const cx0 = ((c.x + (now / 60000) * c.v) % 1.4) * skyW - skyW * 0.2;
-      const cy0 = c.y * hy;
+      const cy0 = 8 + c.y * Math.max(40, peakY * 1.6);
       for (let k = 0; k < 3; k++) {
         skyCtx.beginPath();
-        skyCtx.ellipse(cx0 + k * 28 * c.s, cy0 + (k % 2) * 6, 40 * c.s, 14 * c.s, 0, 0, Math.PI * 2);
+        skyCtx.ellipse(cx0 + k * 28 * c.s, cy0 + (k % 2) * 6, 36 * c.s, 12 * c.s, 0, 0, Math.PI * 2);
         skyCtx.fill();
       }
     }
   } else if (sc.sun.alt > -2) {
-    skyCtx.fillStyle = 'rgba(255,255,255,.1)';
-    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.2, hy * 0.25, 50, 16, 0, 0, Math.PI * 2); skyCtx.fill();
-    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.7, hy * 0.18, 60, 18, 0, 0, Math.PI * 2); skyCtx.fill();
+    skyCtx.fillStyle = 'rgba(255,255,255,.12)';
+    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.22, peakY * 0.7, 44, 13, 0, 0, Math.PI * 2); skyCtx.fill();
+    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.72, peakY * 0.55, 52, 14, 0, 0, Math.PI * 2); skyCtx.fill();
   }
 
-  // map scene x/y → pixels (horizon = dial mid)
+  // map scene x/y → pixels: y=0 at dial midline (horizon), y=1 at peak in the clear top band
   const spanX = Math.min(skyW * 0.42, 220);
-  const spanY = Math.min(hy * 0.85, 260);
+  const spanY = Math.max(60, hy - peakY);
   const sx = cx + sc.x * spanX, sy = hy - sc.y * spanY;
   const mx = cx + sc.mx * spanX, my = hy - sc.my * spanY;
 

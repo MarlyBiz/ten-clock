@@ -8,7 +8,17 @@
   color: var(--ink);
 }
 * { box-sizing: border-box; }
-html, body { background: transparent; }
+html, /* Clear ~100–120px band above the dial card for the sun/moon peak (keep dial+slider on one phone screen) */
+.top { padding: 8px 4px 2px; gap: 2px 10px; }
+.top .tag { font-size: .82rem; }
+.top .install { margin-top: 0; }
+.card.hero { margin-top: 10px; }
+@media (max-width: 480px) {
+  .top .tag { display: none; } /* reclaim vertical space for the sky band + dial */
+  .brand { font-size: 1.15rem; }
+  .card.hero { margin-top: 22px; }
+}
+body { background: transparent; }
 body {
   margin: 0; min-height: 100vh; line-height: 1.5;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -308,3 +318,6 @@ body > *:not(#sky) { position: relative; z-index: 1; }
   .tag { font-size: .85rem; }
 }
 body.previewing .master-time { color: #ffd27a; }
+
+/* Hidden converter (Slide time) — kept in DOM for logic; easy to restore by removing this rule */
+.card.slide { display: none !important; }
