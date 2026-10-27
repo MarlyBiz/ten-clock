@@ -362,3 +362,12 @@ body.previewing .master-time { color: #ffd27a; }
 .tri-row.regular .tri-time {
   font-size: clamp(1.45rem, 6.5vw, 2.2rem);
 }
+
+/* Standard minute track (inside hour ring; 0 at top = minute hand zero) */
+.m-tick { stroke: rgba(185, 210, 255, .38); stroke-width: 1; stroke-linecap: round; }
+.m-tick.major { stroke: rgba(210, 230, 255, .82); stroke-width: 1.6; }
+.m-num { fill: rgba(170, 195, 235, .72); font-weight: 600; text-anchor: middle; dominant-baseline: central;
+  font-variant-numeric: tabular-nums; pointer-events: none; }
+.ring.regular .m-tick { stroke: rgba(143, 184, 255, .4); }
+.ring.regular .m-tick.major { stroke: rgba(180, 210, 255, .88); stroke-width: 1.5; }
+.ring.regular .m-num { fill: rgba(160, 190, 235, .7); }

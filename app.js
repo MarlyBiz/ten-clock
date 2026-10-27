@@ -82,8 +82,29 @@ function secTrack(parent, r, kind, dotR) {
 
 /** AM/PM half-ring tints for a noon-at-top traditional dial (PM = right half, AM = left half). */
 const h12 = (h) => h % 12 || 12;
+/**
+ * Minute track for the Standard minute hand. 0 at top (matches setHands minute rot).
+ * Ticks on the INSIDE edge of the hour ring; numbers only when the dial is large.
+ */
+function paintMinuteMarks(g, rEdge, { showNums = false, numR, numFs = 7 } = {}) {
+  const rLabel = numR ?? (rEdge - Math.max(9, rEdge * 0.14));
+  for (let m = 0; m < 60; m++) {
+    const major = m % 5 === 0;
+    const turns = m / 60; // same orientation as minute hand (0 = top)
+    const len = major ? Math.min(7, rEdge * 0.12) : Math.min(3.6, rEdge * 0.065);
+    const [x1, y1] = polar(rEdge, turns);
+    const [x2, y2] = polar(rEdge - len, turns);
+    el('line', { class: `m-tick${major ? ' major' : ''}`, x1, y1, x2, y2 }, g);
+  }
+  if (!showNums) return;
+  for (let m = 0; m < 60; m += 5) {
+    const [x, y] = polar(rLabel, m / 60);
+    el('text', { class: 'm-num', x, y, 'font-size': numFs }, g).textContent = String(m);
+  }
+}
+
 /** Paint Regular dial face for the current 12h/24h setting into a group (clears it first). */
-function paintRegularFace(g, { rBand, bandW, rNum, rAmpm, numCls = 'r-num', ampmCls = 'r-ampm', fs = 14, fa = 10 }) {
+function paintRegularFace(g, { rBand, bandW, rNum, rAmpm, numCls = 'r-num', ampmCls = 'r-ampm', fs = 14, fa = 10, showMinNums = false }) {
   while (g.firstChild) g.removeChild(g.firstChild);
   if (hourFmt === '12') {
     el('path', { class: 'half-pm', d: `M0 ${-rBand}A${rBand} ${rBand} 0 0 1 0 ${rBand}`, 'stroke-width': bandW }, g);
@@ -104,6 +125,9 @@ function paintRegularFace(g, { rBand, bandW, rNum, rAmpm, numCls = 'r-num', ampm
       el('text', { class: `${numCls}${h % 6 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y, 'font-size': fs }, g).textContent = T.regularDialLabels('24')[h];
     }
   }
+  // Inside edge of the hour ring — readable against the long minute hand
+  const rIn = rBand - bandW / 2;
+  paintMinuteMarks(g, rIn, { showNums: showMinNums, numFs: Math.max(6, Math.min(9, bandW * 0.22)) });
 }
 
 /** 24-hour analogue dial: noon at top, midnight at bottom (like a sun dial). */
@@ -119,7 +143,7 @@ function build24Dial(svg) {
     el('line', { class: `a-tick${hr ? ' hour' : ''}`, x1, y1, x2, y2 }, svg);
   }
   const face = el('g', { class: 'reg-face' }, svg);
-  const paint = () => paintRegularFace(face, { rBand: 64, bandW: 24, rNum: 64, rAmpm: 42, numCls: 'a-num', ampmCls: 'a-ampm', fs: 11.5, fa: 10 });
+  const paint = () => paintRegularFace(face, { rBand: 64, bandW: 24, rNum: 64, rAmpm: 42, numCls: 'a-num', ampmCls: 'a-ampm', fs: 11.5, fa: 10, showMinNums: true });
   paint();
   const rise = el('circle', { class: 'd-sun', r: 4.5, cx: 0, cy: -R24 }, svg);
   const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
@@ -392,7 +416,8 @@ function buildCombo() {
     } else {
       const face = el('g', { class: 'reg-face' }, g);
       paintRegularFace(face, { rBand: rO - w / 2, bandW: w, rNum: rN, rAmpm: rO - w * 0.9,
-        fs: Math.min(15, w * 0.23), fa: Math.max(7, Math.min(11, w * 0.15)) });
+        fs: Math.min(15, w * 0.23), fa: Math.max(7, Math.min(11, w * 0.15)),
+        showMinNums: on.length === 1 }); // numbers only when Standard is the sole large ring
     }
     // fixed day-start mark (Ten 0 = 6 PM): a white diamond on the band edge — distinct from the sun dots
     const zt = ten ? 0 : turns24(18 * 3600), [zx, zy] = polar(rO - w * 0.17, zt), d = Math.min(9, w * 0.16);
