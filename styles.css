@@ -335,3 +335,30 @@ body.previewing .master-time { color: #ffd27a; }
 .sc-hint { font-size: .78rem; color: #ffd27a; font-weight: 600; text-align: right; }
 .sc-v { grid-column: 1 / -1; font-size: .92rem; color: var(--ink); line-height: 1.35; }
 .sc-v b { font-weight: 650; }
+
+/* Standard 12h: AM/PM as a small inline suffix (same box height as 24h) */
+.ampm-sfx {
+  display: inline-block;
+  font-size: 0.42em;
+  font-weight: 650;
+  letter-spacing: .04em;
+  margin-left: 0.3em;
+  vertical-align: 0.55em;
+  line-height: 1;
+  color: var(--accent2);
+  font-variant-numeric: normal;
+}
+.master-time .ampm-sfx { font-size: 0.72em; vertical-align: baseline; margin-left: 0.22em; color: inherit; opacity: .9; }
+.tri-time .ampm-sfx { vertical-align: 0.5em; }
+.sc-v .ampm-sfx { font-size: 0.78em; vertical-align: baseline; margin-left: 0.18em; color: var(--mute); }
+.ten-big, .tri-time.std-nowrap, .tri-row.regular .tri-time, .master-time, .sep-read .ten-big {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ten-big {
+  font-size: clamp(2.6rem, 13.5vw, 6.5rem); /* fit 12h+suffix at 360–412 */
+  line-height: 1.05;
+}
+.tri-row.regular .tri-time {
+  font-size: clamp(1.45rem, 6.5vw, 2.2rem);
+}

@@ -147,14 +147,39 @@ const zoneShort = (d) => new Intl.DateTimeFormat(undefined, { timeZoneName: 'sho
 const dateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 const fmtYMD = ({ y, m, d }) => dateFmt.format(new Date(Date.UTC(y, m - 1, d)));
 const civilDateFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-const t12 = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
 const t24 = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const t12en = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true });
+const t12Parts = (d, withSec) => {
+  const opts = { hour: 'numeric', minute: '2-digit', hour12: true };
+  if (withSec) opts.second = '2-digit';
+  const parts = new Intl.DateTimeFormat('en-US', opts).formatToParts(d);
+  let hour = '', minute = '', second = '', dayPeriod = '';
+  for (const p of parts) {
+    if (p.type === 'hour') hour = p.value;
+    else if (p.type === 'minute') minute = p.value;
+    else if (p.type === 'second') second = p.value;
+    else if (p.type === 'dayPeriod') dayPeriod = p.value.toUpperCase();
+  }
+  const digits = withSec ? `${hour}:${minute}:${second}` : `${hour}:${minute}`;
+  return { digits, ampm: dayPeriod };
+};
+/** 12h HTML: digits + small inline AM/PM (never wraps under the time). */
+const ampmSfx = (ampm) => `<span class="ampm-sfx">${ampm}</span>`;
+const fmt12Html = (d, withSec = false) => { const { digits, ampm } = t12Parts(d, withSec); return `${digits}${ampmSfx(ampm)}`; };
+const fmt12Plain = (d, withSec = false) => { const { digits, ampm } = t12Parts(d, withSec); return `${digits}\u00A0${ampm}`; };
 
 /* ---------- 12h / 24h preference (default 12h, remembered) ---------- */
 const FMT_KEY = 'ten.hourFormat.v1';
 let hourFmt = (() => { try { return localStorage.getItem(FMT_KEY) === '24' ? '24' : '12'; } catch { return '12'; } })();
-const tradHM = (d) => (hourFmt === '24' ? t24 : t12).format(d);
+/** Standard clock HM for textContent contexts; 12h uses NBSP so AM/PM stays on one line. */
+const tradHM = (d) => (hourFmt === '24' ? t24.format(d) : fmt12Plain(d, false));
+const stdClockHtml = (d, withSec = true) => {
+  if (hourFmt === '24') {
+    return withSec
+      ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+      : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  return fmt12Html(d, withSec);
+};
 const mainDial = buildTenDial($('dial'));
 const tradDial = build24Dial($('analog'));
 const exactDial = buildTenDial($('exact-dial'), { track: false }); // no seconds dot for Meridian
@@ -192,7 +217,7 @@ function updateSun(now, tenDate) {
   } else {
     shade(mainDial, T.sharedTen(s.sunrise) / 100000, T.sharedTen(s.sunset) / 100000);
     shade(tradDial, turns24(T.localSecondsOfDay(s.sunrise)), turns24(T.localSecondsOfDay(s.sunset)));
-    SUN.shared = { rise: `${tenHM(T.sharedTen(s.sunrise))} · ${t12.format(s.sunrise)}`, set: `${tenHM(T.sharedTen(s.sunset))} · ${t12.format(s.sunset)}` };
+    SUN.shared = { rise: `${tenHM(T.sharedTen(s.sunrise))} · ${fmt12Plain(s.sunrise)}`, set: `${tenHM(T.sharedTen(s.sunset))} · ${fmt12Plain(s.sunset)}` };
     SUN.regular = { rise: tradHM(s.sunrise), set: tradHM(s.sunset) };
   }
   if (!se.sunrise || !se.sunset) {
@@ -201,7 +226,7 @@ function updateSun(now, tenDate) {
   } else {
     const er = T.exactTen(se.sunrise, p.lon), es = T.exactTen(se.sunset, p.lon);
     shade(exactDial, er / 100000, es / 100000);
-    SUN.exact = { rise: `${tenHM(er)} · ${t12.format(se.sunrise)}`, set: `${tenHM(es)} · ${t12.format(se.sunset)}` };
+    SUN.exact = { rise: `${tenHM(er)} · ${fmt12Plain(se.sunrise)}`, set: `${tenHM(es)} · ${fmt12Plain(se.sunset)}` };
   }
   sliderSun(s, se, p);
 }
@@ -227,6 +252,7 @@ function sky(pos) {
 /* ---------- main loop ---------- */
 const last = {};
 const set = (id, text) => { if (last[id] !== text) { last[id] = text; $(id).textContent = text; } };
+const setHtml = (id, html) => { if (last[id] !== html) { last[id] = html; $(id).innerHTML = html; } };
 let lastLive = '', lastSecond = -1;
 
 function frame() {
@@ -268,8 +294,8 @@ function slowUpdate(now, sh) {
   const exLon = loc ? loc.lon : T.zoneCentreLongitude(now), approx = !loc;
   const ex = T.exactTen(now, exLon), ed = T.exactTenDate(now, exLon);
   const h24 = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  const h12s = t12en.format(now).replace(/\u202f|\s/g, ' ');
-  const regMain = hourFmt === '24' ? h24 : h12s, regSub = hourFmt === '24' ? h12s : `${h24} · 24-hour`;
+  const regMain = stdClockHtml(now, true);
+  const regSub = hourFmt === '24' ? fmt12Plain(now, true) : `${h24} · 24-hour`;
   const off = T.exactMinusSharedSeconds(now, exLon);
   const offTxt = Math.abs(off) < 0.5 ? 'Same as Shared.'
     : `${dur(off)} ${off < 0 ? 'behind' : 'ahead of'} Shared (${(Math.abs(off) / T.TEN_MINUTE_S).toFixed(1)} Ten-minutes)`;
@@ -282,13 +308,17 @@ function slowUpdate(now, sh) {
     regular: { label: `Standard · ${zl}`, time: regMain, sub: regSub, date: civilDateFmt.format(now), note: 'The calendar date changes at midnight.' },
   };
   // Combined
-  for (const k of ['shared', 'exact', 'regular']) { set(`c-${k}`, R[k].time); set(`c-${k}-date`, R[k].date); }
+  for (const k of ['shared', 'exact', 'regular']) {
+    (k === 'regular' ? setHtml : set)(`c-${k}`, R[k].time);
+    set(`c-${k}-date`, R[k].date);
+  }
   set('c-note', td.rolled ? 'Ten date changed at 6 PM (sunset hour 0); the Standard date changes at midnight.' : 'Ten days start at 0 = 6 PM; Standard days at midnight.');
   // Separate (the picked clock)
   const P = R[pick];
   set('shared-label', view === 'combined' ? `Shared · ${zl}` : P.label);
-  set('s-time', P.time); set('s-sub', P.sub); set('s-date', P.date); set('s-note', P.note);
-  set('s-rise', SUN[pick].rise); set('s-set', SUN[pick].set);
+  (pick === 'regular' ? setHtml : set)('s-time', P.time);
+  set('s-sub', P.sub); set('s-date', P.date); set('s-note', P.note);
+  setHtml('s-rise', SUN[pick].rise); setHtml('s-set', SUN[pick].set);
   set('sun-note', SUN.note);
 
   // location card
@@ -815,12 +845,8 @@ function masterJump(date) {
 }
 function masterRender() {
   const d = masterClock();
-  if (MASTER.live) set('master-big', '');
-  else {
-    const h12s = t12en.format(d).replace(/\u202f|\s/g, ' ').replace(/:\d{2}(?=\s|$)/, '');
-    const h24 = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    set('master-big', hourFmt === '24' ? h24 : h12s);
-  }
+  if (MASTER.live) setHtml('master-big', '');
+  else setHtml('master-big', stdClockHtml(d, false));
   $('master-now').setAttribute('aria-pressed', String(MASTER.live));
   document.body.classList.toggle('previewing', !MASTER.live);
 }
@@ -972,7 +998,7 @@ function syncRange() {
   range.value = SL.drive === 'regular' ? Math.round((f * 1440) / 5) * 5 % 1440 : Math.floor(f * 1000 + 1e-9) % 1000;
 }
 
-const regStr = (d) => (hourFmt === '24' ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : t12.format(d));
+const regStr = (d) => (hourFmt === '24' ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : fmt12Plain(d, false));
 function sliderRender() {
   const d = SL.instant, lon = slLon();
   const e = T.equivalents(d, lon);
@@ -1037,7 +1063,7 @@ const scLen = (h) => {
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
 };
 /** Format a sunrise/sunset Date in the device zone — DST follows that event's own date. */
-const scHM = (d) => (d ? tradHM(d) : '—');
+const scHM = (d) => (d ? (hourFmt === '24' ? t24.format(d) : fmt12Html(d, false)) : '—');
 let scKey = '';
 function renderSunCal(now = new Date()) {
   const list = $('sc-list'), note = $('sc-note');
