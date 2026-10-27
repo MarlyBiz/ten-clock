@@ -478,21 +478,37 @@ const mix3 = (a, b, t) => a.map((c, i) => {
   return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * t).toString(16).padStart(2, '0')).join('');
 });
 function drawMoon(ctx, x, y, r, frac, waxing) {
-  if (frac < 0.04) {
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(220,230,255,.28)'; ctx.lineWidth = 1.4; ctx.stroke(); return;
+  // Soft outer glow (always — especially important near new moon)
+  const glow = ctx.createRadialGradient(x, y, r * 0.2, x, y, r * 3.2);
+  glow.addColorStop(0, 'rgba(230,240,255,.55)');
+  glow.addColorStop(0.35, 'rgba(180,200,255,.22)');
+  glow.addColorStop(1, 'rgba(140,170,255,0)');
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, Math.PI * 2); ctx.fill();
+  if (frac < 0.06) {
+    // Obvious new-moon glow ring — clearly visible day or night, no bright disk
+    const g2 = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2.8);
+    g2.addColorStop(0, 'rgba(210,225,255,.15)');
+    g2.addColorStop(0.45, 'rgba(190,210,255,.45)');
+    g2.addColorStop(0.7, 'rgba(170,195,255,.35)');
+    g2.addColorStop(1, 'rgba(140,170,255,0)');
+    ctx.fillStyle = g2; ctx.beginPath(); ctx.arc(x, y, r * 2.8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r * 1.08, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(230,240,255,.85)'; ctx.lineWidth = Math.max(3, r * 0.22); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, r * 1.45, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(180,205,255,.45)'; ctx.lineWidth = Math.max(2, r * 0.12); ctx.stroke();
+    return;
   }
   ctx.save();
-  // lit disk
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#e8eeff'; ctx.fill();
-  // shadow disk offset (waxing = lit on the right)
+  ctx.fillStyle = '#f2f6ff'; ctx.fill();
   if (frac < 0.995) {
-    const phase = (waxing ? 1 : -1) * (1 - 2 * frac); // −1..1
+    const phase = (waxing ? 1 : -1) * (1 - 2 * frac);
     ctx.beginPath(); ctx.arc(x + phase * r, y, r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(8,12,32,.92)'; ctx.fill();
   }
   ctx.restore();
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1.2; ctx.stroke();
 }
 function paintSky(date, force = false) {
   const now = performance.now();
@@ -541,10 +557,11 @@ function paintSky(date, force = false) {
   const sx = cx + sc.x * spanX, sy = hy - sc.y * spanY;
   const mx = cx + sc.mx * spanX, my = hy - sc.my * spanY;
 
-  // moon (behind sun if both up; dominant at night)
-  if (sc.moon.alt > -8) {
-    const mr = sc.sun.alt < 0 ? 18 : 11;
-    const a = sc.sun.alt < 0 ? 1 : 0.55;
+  // moon on the same arc as the sun (rise→peak in top band→set); drawn after stars/clouds, before sun
+  if (sc.moon.alt > -6) {
+    const mr = sc.sun.alt < 0 ? 22 : 18; // roughly sun-sized
+    // Daytime: still clearly visible when up; night: full brightness
+    const a = sc.sun.alt < -3 ? 1 : sc.sun.alt < 5 ? 0.9 : 0.75;
     skyCtx.globalAlpha = a;
     drawMoon(skyCtx, mx, my, mr, sc.moon.frac, sc.moon.waxing);
     skyCtx.globalAlpha = 1;
@@ -944,6 +961,16 @@ renderLocUI();
 masterSyncRange(); masterRender();
 resizeSky(); paintSky(new Date(), true);
 requestAnimationFrame(frame);
+
+
+// Test/screenshot hook: preview dials+sky at an arbitrary instant (ISO string)
+window.__tenPreviewAt = (iso) => {
+  const d = new Date(iso);
+  MASTER.live = false; MASTER.instant = d;
+  SL.live = false; SL.instant = d; skySliding = true;
+  masterSyncRange(d); masterRender(); syncRange(); sliderRender();
+  paintSky(d, true); slowUpdate(d, T.sharedTen(d)); lastSecond = -1;
+};
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

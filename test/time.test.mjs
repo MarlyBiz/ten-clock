@@ -205,3 +205,25 @@ test('Solar noon lies between sunrise and sunset (Walled Lake)', () => {
   assert.ok(sc.y > 0.85, `sun near top of sky at noon (y=${sc.y})`);
   assert.ok(Math.abs(sc.x) < 0.35, `sun near centre at noon (x=${sc.x})`);
 });
+
+test('Moon tonight (Walled Lake) is up and on-screen, not clamped to the edge', () => {
+  // 2026-10-26 evening: near-full moon rising in the east for Walled Lake, MI
+  const nine = T.skyScene(new Date('2026-10-27T01:00:00Z'), 42.538, -83.481); // 9 PM EDT
+  const mid = T.skyScene(new Date('2026-10-27T04:00:00Z'), 42.538, -83.481); // midnight
+  assert.ok(nine.moon.alt > 15, `9 PM moon alt ${nine.moon.alt}`);
+  assert.ok(nine.moon.frac > 0.9, `near full frac ${nine.moon.frac}`);
+  assert.ok(nine.mx >= -1 && nine.mx <= 1, `9 PM moon on-screen mx=${nine.mx}`);
+  assert.ok(nine.my > 0.2, `9 PM moon above horizon my=${nine.my}`);
+  assert.ok(mid.moon.alt > 40, `midnight moon alt ${mid.moon.alt}`);
+  assert.ok(mid.my > 0.7, `midnight moon high my=${mid.my}`);
+  // Moon in the east at 9 PM → same framing as sun → right of centre
+  assert.ok(nine.mx > 0.2, `9 PM moon on the right mx=${nine.mx}`);
+});
+
+test('New moon has near-zero illumination (glow-only draw path)', () => {
+  const jdNew = 2451550.1;
+  const d = new Date((jdNew - 2440587.5) * 86400000);
+  const m = T.moonPosition(d, 42.5, -83.5);
+  assert.ok(m.frac < 0.06, `new moon frac ${m.frac}`);
+});
+

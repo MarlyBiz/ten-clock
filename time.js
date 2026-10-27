@@ -285,9 +285,11 @@ export function skyScene(date, latDeg, lonDeg) {
   const morningRight = southHem ? dAz : -dAz;
   const x = Math.max(-1, Math.min(1, morningRight / 90));
   const y = sun.alt <= 0 ? Math.max(-0.6, sun.alt / 18) : Math.min(1, sun.alt / maxAlt);
-  let mdAz = mod(moon.az - sun.az + 180, 360) - 180;
-  if (!southHem) mdAz = -mdAz;
-  const mx = Math.max(-1.35, Math.min(1.35, mdAz / 90));
+  // Moon uses the SAME screen arc as the sun (own azimuth vs meridian), not offset-from-sun
+  // (offset-from-sun shoved the moon off-screen whenever it was far from the sun in azimuth).
+  let mDAz = mod(moon.az - meridianAz + 180, 360) - 180;
+  const mMorningRight = southHem ? mDAz : -mDAz;
+  const mx = Math.max(-1, Math.min(1, mMorningRight / 90));
   const my = moon.alt <= 0 ? Math.max(-0.6, moon.alt / 18) : Math.min(1, moon.alt / maxAlt);
   return { sun, moon, x, y, mx, my, facing: sun.az, southHem, maxAlt };
 }
