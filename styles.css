@@ -220,3 +220,4 @@ b { font-weight: 600; }
 .half-am { stroke: rgba(143,184,255,.15); }
 .r-ampm.pm, .a-ampm.pm { fill: #ffcf99; } .r-ampm.am, .a-ampm.am { fill: #b9d2ff; }
 .a-ampm { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-anchor: middle; dominant-baseline: central; }
+.c-sec.regular circle { fill: #8fb8ff; filter: drop-shadow(0 0 2px #8fb8ff); }

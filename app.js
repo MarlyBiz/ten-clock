@@ -96,9 +96,10 @@ function build24Dial(svg) {
   const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
   const hand = (cls, len) => el('line', { class: `hand ${cls}`, x1: 0, y1: 8, x2: 0, y2: -len }, svg);
   const h = hand('ah', 44), m = hand('am', 70), s = hand('as', 80);
+  const sd = el('g', { class: 'c-sec regular' }, svg); el('circle', { cx: 0, cy: -95, r: 2.6 }, sd);
   el('circle', { class: 'hub', r: 3.5 }, svg);
   return { dayArc, rise, set: setS, R: R24,
-    setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); } };
+    setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); rot(sd, ((sec % 60) / 60) * 360); } };
 }
 
 /** Shade a dial's day arc and place sun markers; a, b in turns (0 = top, clockwise). */
@@ -296,7 +297,7 @@ function buildCombo() {
   el('circle', { class: 'd-face', r: 198 }, combo);
   const on = RING_ORDER.filter((k) => rings[k]);
   const bands = T.ringBands(on.length);
-  comboParts = { hands: {}, sun: {}, sec: null };
+  comboParts = { hands: {}, sun: {}, sec: null, secReg: null };
   on.forEach((k, i) => {
     const { rOuter: rO, width: w } = bands[i];
     const g = el('g', { class: `ring ${k}` }, combo);
@@ -339,6 +340,7 @@ function buildCombo() {
     const set = el('circle', { class: 'd-sun set', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
     comboParts.sun[k] = { dayArc, rise, set, R: rS };
     comboParts.hands[k] = T.ringHand(bands[i], i === on.length - 1);
+    if (k === 'regular') comboParts.regR = rO - 3.5;
   });
   // hands on top, outer ring's (Shared) drawn last so it is most prominent
   [...on].reverse().forEach((k) => {
@@ -351,6 +353,10 @@ function buildCombo() {
   if (rings.shared) { // smooth Ten-second sweep dot on the outer edge
     comboParts.sec = el('g', { class: 'c-sec' }, combo);
     el('circle', { cx: 0, cy: -192, r: 3.2 }, comboParts.sec);
+  }
+  if (rings.regular) { // blue seconds dot: one lap per 60 SI seconds
+    comboParts.secReg = el('g', { class: 'c-sec regular' }, combo);
+    el('circle', { cx: 0, cy: -comboParts.regR, r: 3 }, comboParts.secReg);
   }
   el('circle', { class: 'hub', r: 6 }, combo);
   document.querySelectorAll('.ring-sw').forEach((b) => b.setAttribute('aria-pressed', String(rings[b.dataset.ring])));
@@ -371,6 +377,7 @@ function paintComboSun() {
 function comboHands(v) {
   for (const [k, h] of Object.entries(comboParts.hands)) if (h.g) rot(h.g, toTurns[k](v[k]) * 360);
   if (comboParts.sec) rot(comboParts.sec, ((v.shared % 100) / 100) * 360);
+  if (comboParts.secReg) rot(comboParts.secReg, ((v.regular % 60) / 60) * 360);
 }
 
 function applyView() {
