@@ -9,7 +9,7 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 ## What it shows (in order of prominence)
 
 1. **Ten · Shared** (the authority): Ten time from your time zone's civil clock, DST included. Everyone in the same zone shares it, so you can say "call you at 2". Under it you get a large 10-hour dial with today's real sunrise and sunset shaded and marked, a digital readout, and the Ten date.
-2. **Traditional**: a classic 12-hour analogue face, 24-hour digital time and the calendar date.
+2. **Standard**: a classic 12/24-hour analogue face, 24-hour digital time and the calendar date.
 3. **Ten · Exact**: local mean solar time on your meridian (`UTC + longitude/15 h`, zero at 18:00). It depends **only on longitude**, so people due north and due south (either hemisphere) get the exact same time. It also shows the offset from Shared and a "true sun" (apparent solar time) readout. Your location comes from browser geolocation, and only when you tap the button, or you can type it in. It is stored only in `localStorage`.
 4. **Star clock**: Greenwich and local mean sidereal time (IAU/Meeus formula), shown as 24h and as Star-Ten (sidereal day ÷ 10). This is for reference only, because the star day (23h 56m 4.09s) slips about 4 minutes a day against the sun.
 
@@ -17,12 +17,12 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 
 | File | Purpose |
 |---|---|
-| `index.html` | Page markup (Shared hero, Traditional, Exact, Star clock, explainer) |
+| `index.html` | Page markup (Shared hero, Standard, Exact, Star clock, explainer) |
 | `styles.css` | Night-sky theme, responsive from 360px up |
 | `app.js` | Builds the SVG dials and runs the `requestAnimationFrame` loop, location UI and sky gradient |
 | `time.js` | Pure ES module with all the math: Ten conversions, Ten date, LMST, GMST/LST, NOAA sun, equation of time |
 | `assets/sky/moon.png` | NASA public-domain moon texture (see `CREDITS.md`) |
-| `sw.js` | Optional, versioned offline cache (`ten-v19`). Bump it on changes |
+| `sw.js` | Optional, versioned offline cache (`ten-v20`). Bump it on changes |
 | `favicon.svg` | Icon (also used by the PWA manifest) |
 | `manifest.webmanifest` | Installable PWA manifest |
 | `_headers` | Cloudflare Pages security and cache headers (strict CSP, no third parties) |
