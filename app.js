@@ -81,11 +81,30 @@ function secTrack(parent, r, kind, dotR) {
 }
 
 /** AM/PM half-ring tints for a noon-at-top traditional dial (PM = right half, AM = left half). */
-function ampmHalves(svg, r, sw) {
-  el('path', { class: 'half-pm', d: `M0 ${-r}A${r} ${r} 0 0 1 0 ${r}`, 'stroke-width': sw }, svg);
-  el('path', { class: 'half-am', d: `M0 ${r}A${r} ${r} 0 0 1 0 ${-r}`, 'stroke-width': sw }, svg);
-}
 const h12 = (h) => h % 12 || 12;
+/** Paint Regular dial face for the current 12h/24h setting into a group (clears it first). */
+function paintRegularFace(g, { rBand, bandW, rNum, rAmpm, numCls = 'r-num', ampmCls = 'r-ampm', fs = 14, fa = 10 }) {
+  while (g.firstChild) g.removeChild(g.firstChild);
+  if (hourFmt === '12') {
+    el('path', { class: 'half-pm', d: `M0 ${-rBand}A${rBand} ${rBand} 0 0 1 0 ${rBand}`, 'stroke-width': bandW }, g);
+    el('path', { class: 'half-am', d: `M0 ${rBand}A${rBand} ${rBand} 0 0 1 0 ${-rBand}`, 'stroke-width': bandW }, g);
+    for (let h = 0; h < 24; h++) {
+      const [x, y] = polar(rNum, turns24(h * 3600));
+      el('text', { class: `${numCls}${h % 12 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y, 'font-size': fs }, g).textContent = T.regularDialLabels('12')[h];
+    }
+    for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
+      const [x, y] = polar(rAmpm, turns24(hr * 3600));
+      el('text', { class: `${ampmCls} ${lab.toLowerCase()}`, x, y, 'font-size': fa }, g).textContent = lab;
+    }
+  } else {
+    // 24h: 0 at bottom, 12 at top, 18 at right (current hand orientation); neutral band, no AM/PM
+    el('circle', { class: 'r-band', r: rBand, 'stroke-width': bandW }, g);
+    for (let h = 0; h < 24; h++) {
+      const [x, y] = polar(rNum, turns24(h * 3600));
+      el('text', { class: `${numCls}${h % 6 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y, 'font-size': fs }, g).textContent = T.regularDialLabels('24')[h];
+    }
+  }
+}
 
 /** 24-hour analogue dial: noon at top, midnight at bottom (like a sun dial). */
 const R24 = 86;
@@ -99,22 +118,16 @@ function build24Dial(svg) {
     const [x1, y1] = polar(hr ? 75 : 78, i / 96), [x2, y2] = polar(81, i / 96);
     el('line', { class: `a-tick${hr ? ' hour' : ''}`, x1, y1, x2, y2 }, svg);
   }
-  ampmHalves(svg, 64, 24);
-  for (let h = 0; h < 24; h++) {
-    const [x, y] = polar(64, turns24(h * 3600));
-    el('text', { class: `a-num${h % 12 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y }, svg).textContent = h12(h);
-  }
-  for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
-    const [x, y] = polar(42, turns24(hr * 3600));
-    el('text', { class: `a-ampm ${lab.toLowerCase()}`, x, y }, svg).textContent = lab;
-  }
+  const face = el('g', { class: 'reg-face' }, svg);
+  const paint = () => paintRegularFace(face, { rBand: 64, bandW: 24, rNum: 64, rAmpm: 42, numCls: 'a-num', ampmCls: 'a-ampm', fs: 11.5, fa: 10 });
+  paint();
   const rise = el('circle', { class: 'd-sun', r: 4.5, cx: 0, cy: -R24 }, svg);
   const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
   const hand = (cls, len) => el('line', { class: `hand ${cls}`, x1: 0, y1: 8, x2: 0, y2: -len }, svg);
   const h = hand('ah', 44), m = hand('am', 70), s = hand('as', 80);
   const sd = secTrack(svg, 95, 'regular', 4);
   el('circle', { class: 'hub', r: 3.5 }, svg);
-  return { dayArc, rise, set: setS, R: R24,
+  return { dayArc, rise, set: setS, R: R24, refreshLabels: paint,
     setHands(sec) { rot(h, turns24(sec) * 360); rot(m, ((sec % 3600) / 3600) * 360); rot(s, ((sec % 60) / 60) * 360); sd((sec % 60) / 60); } };
 }
 
@@ -127,10 +140,6 @@ function shade(d, a, b) {
   d.rise.setAttribute('cx', x1.toFixed(2)); d.rise.setAttribute('cy', y1.toFixed(2)); d.rise.removeAttribute('visibility');
   d.set.setAttribute('cx', x2.toFixed(2)); d.set.setAttribute('cy', y2.toFixed(2)); d.set.removeAttribute('visibility');
 }
-
-const mainDial = buildTenDial($('dial'));
-const tradDial = build24Dial($('analog'));
-const exactDial = buildTenDial($('exact-dial'), { track: false }); // no seconds dot for Meridian
 
 /* ---------- formatting ---------- */
 const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local time';
@@ -146,6 +155,11 @@ const t12en = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-dig
 const FMT_KEY = 'ten.hourFormat.v1';
 let hourFmt = (() => { try { return localStorage.getItem(FMT_KEY) === '24' ? '24' : '12'; } catch { return '12'; } })();
 const tradHM = (d) => (hourFmt === '24' ? t24 : t12).format(d);
+const mainDial = buildTenDial($('dial'));
+const tradDial = build24Dial($('analog'));
+const exactDial = buildTenDial($('exact-dial'), { track: false }); // no seconds dot for Meridian
+
+
 const tenHM = (total) => { const { h, m } = T.splitTen(total); return `${h}:${pad(m)}`; };
 function dur(sec) {
   const s = Math.round(Math.abs(sec)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
@@ -322,7 +336,6 @@ function buildCombo() {
   on.forEach((k, i) => {
     const { rOuter: rO, width: w } = bands[i];
     const g = el('g', { class: `ring ${k}` }, combo);
-    if (k === 'regular') ampmHalves(g, rO - w / 2, w); else el('circle', { class: 'r-band', r: rO - w / 2, 'stroke-width': w }, g);
     const rS = rO - w * 0.17, sw = Math.min(w * 0.26, 22);
     el('circle', { class: 'r-night', r: rS, 'stroke-width': sw }, g);
     const dayArc = el('path', { class: 'r-day', d: '', 'stroke-width': sw }, g);
@@ -336,22 +349,16 @@ function buildCombo() {
     }
     const rN = rO - w * 0.64;
     if (ten) {
+      el('circle', { class: 'r-band', r: rO - w / 2, 'stroke-width': w }, g);
       const fs = Math.min(28, w * 0.34);
       for (let h = 0; h < 10; h++) {
         const [x, y] = polar(rN, h / 10);
         el('text', { class: `r-num${h === 0 ? ' zero' : ''}`, x, y, 'font-size': fs }, g).textContent = h;
       }
     } else {
-      const fs = Math.min(15, w * 0.23);
-      for (let h = 0; h < 24; h++) { // 12-hour numbers, one revolution per day
-        const [x, y] = polar(rN, turns24(h * 3600));
-        el('text', { class: `r-num${h % 12 === 0 ? ' major' : ''}`, x, y, 'font-size': fs }, g).textContent = h12(h);
-      }
-      const fa = Math.max(7, Math.min(11, w * 0.15));
-      for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
-        const [x, y] = polar(rO - w * 0.9, turns24(hr * 3600));
-        el('text', { class: `r-ampm ${lab.toLowerCase()}`, x, y, 'font-size': fa }, g).textContent = lab;
-      }
+      const face = el('g', { class: 'reg-face' }, g);
+      paintRegularFace(face, { rBand: rO - w / 2, bandW: w, rNum: rN, rAmpm: rO - w * 0.9,
+        fs: Math.min(15, w * 0.23), fa: Math.max(7, Math.min(11, w * 0.15)) });
     }
     // fixed day-start mark (Ten 0 = 6 PM): a white diamond on the band edge — distinct from the sun dots
     const zt = ten ? 0 : turns24(18 * 3600), [zx, zy] = polar(rO - w * 0.17, zt), d = Math.min(9, w * 0.16);
@@ -604,6 +611,8 @@ $('loc-clear').addEventListener('click', () => { saveLoc(null); $('lon-in').valu
 function applyFmt() {
   document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fmt === hourFmt)));
   sunKey = ''; lastSecond = -1;
+  tradDial.refreshLabels();
+  if (typeof buildCombo === 'function') buildCombo();
   buildBars(); sliderRender();
 }
 document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('click', () => {

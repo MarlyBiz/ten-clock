@@ -216,3 +216,6 @@ export function ringBands(n, outer = 196, inner = 50, gap = 3) {
 export function ringHand(band, innermost) {
   return { r1: innermost ? 0 : band.rInner + 2, r2: band.rOuter - band.width * 0.12 };
 }
+
+/** Labels around a Regular dial for the shared 12h/24h setting. Index = hour-of-day (0..23). */
+export const regularDialLabels = (fmt) => Array.from({ length: 24 }, (_, h) => (fmt === '12' ? (h % 12 || 12) : h));

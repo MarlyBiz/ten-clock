@@ -159,4 +159,11 @@ test('One dial geometry: 24h ring orientation and ring bands', () => {
     if (i < 2) assert.ok(h.r1 > three[i + 1].rOuter, `hand ${i} never reaches the ring inside it`);
   });
   assert.equal(T.ringHand(three[2], true).r1, 0);
+  // 12h: 12 at top/bottom; 24h: 0 at bottom, 12 at top, 18 at right (current clockwise orientation)
+  assert.deepEqual(T.regularDialLabels('12').slice(0, 4), [12, 1, 2, 3]);
+  assert.equal(T.regularDialLabels('12')[12], 12);
+  assert.deepEqual(T.regularDialLabels('24').slice(0, 4), [0, 1, 2, 3]);
+  assert.equal(T.regularDialLabels('24')[12], 12);
+  assert.equal(T.regularDialLabels('24')[18], 18);
+  assert.equal(T.regularDialTurns(18 * 3600), 0.25); // 18:00 at right
 });
