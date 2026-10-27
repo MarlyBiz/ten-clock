@@ -305,10 +305,9 @@ const PICK_KEY = 'ten.pick.v1';
 let pick = 'shared';
 let rings = { shared: true, regular: true, exact: true };
 try {
-  if (localStorage.getItem(VIEW_KEY) === 'separate') view = 'separate';
+  // Every launch opens in Combined with all three rings on; only the Separate picker choice is remembered.
+  localStorage.removeItem(VIEW_KEY); localStorage.removeItem(RINGS_KEY); // clear older saved state
   const pk = localStorage.getItem(PICK_KEY); if (['shared', 'exact', 'regular'].includes(pk)) pick = pk;
-  const r = JSON.parse(localStorage.getItem(RINGS_KEY));
-  if (r && RING_ORDER.some((k) => r[k])) RING_ORDER.forEach((k) => { rings[k] = !!r[k]; });
 } catch { /* ignore */ }
 const combo = $('combo');
 let comboParts = { hands: {}, sun: {}, sec: null };
@@ -411,14 +410,13 @@ document.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('clic
   applyView();
 }));
 document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => {
-  view = b.dataset.view; try { localStorage.setItem(VIEW_KEY, view); } catch { /* ignore */ }
+  view = b.dataset.view; // session only
   applyView();
 }));
 document.querySelectorAll('.ring-sw').forEach((b) => b.addEventListener('click', () => {
   const k = b.dataset.ring;
   if (rings[k] && RING_ORDER.filter((x) => rings[x]).length === 1) return; // keep at least one ring
   rings[k] = !rings[k];
-  try { localStorage.setItem(RINGS_KEY, JSON.stringify(rings)); } catch { /* ignore */ }
   buildCombo();
 }));
 applyView();
