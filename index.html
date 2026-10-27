@@ -38,11 +38,11 @@
       </div>
       <div class="hero-grid">
         <figure class="dial-wrap one-only">
-          <svg id="combo" class="dial" viewBox="-200 -200 400 400" role="img" aria-label="One dial: outer ring Shared Ten, middle ring traditional 24-hour, inner ring Meridian Ten"></svg>
+          <svg id="combo" class="dial" viewBox="-200 -200 400 400" role="img" aria-label="One dial: outer ring Shared Ten, middle ring Meridian Ten, inner ring traditional 24-hour"></svg>
           <figcaption class="legend" role="group" aria-label="Rings shown">
             <button type="button" class="ring-sw" data-ring="shared" aria-pressed="true"><i class="chip shared"></i>Ten (Shared)</button>
-            <button type="button" class="ring-sw" data-ring="regular" aria-pressed="true"><i class="chip regular"></i>24h</button>
             <button type="button" class="ring-sw" data-ring="exact" aria-pressed="true"><i class="chip exact"></i>Meridian</button>
+            <button type="button" class="ring-sw" data-ring="regular" aria-pressed="true"><i class="chip regular"></i>24h</button>
           </figcaption>
           <p class="note legend-note"><span class="sun-dot" aria-hidden="true"></span>sunrise <span class="sun-dot set" aria-hidden="true"></span>sunset <span class="zero-key" aria-hidden="true"></span>0 = 6 PM new day</p>
         </figure>
@@ -73,16 +73,16 @@
       <div class="seg wide" role="group" aria-label="Slide by">
         <span class="seg-label">Slide by</span>
         <button type="button" data-drive="shared" aria-pressed="true">Ten</button>
-        <button type="button" data-drive="regular" aria-pressed="false">Regular</button>
         <button type="button" data-drive="exact" aria-pressed="false">Meridian</button>
+        <button type="button" data-drive="regular" aria-pressed="false">Regular</button>
       </div>
       <p class="sl-big" id="sl-big" aria-hidden="true">—</p>
       <p class="sl-eq" id="sl-eq">—</p>
       <p class="note sl-datenote" id="sl-datenote"></p>
       <div class="bars">
         <div class="bar-row" data-scale="shared"><span class="bar-name">Ten</span><div class="bar" id="bar-shared"></div></div>
-        <div class="bar-row" data-scale="regular"><span class="bar-name">Regular</span><div class="bar" id="bar-regular"></div></div>
         <div class="bar-row" data-scale="exact"><span class="bar-name">Meridian</span><div class="bar" id="bar-exact"></div></div>
+        <div class="bar-row" data-scale="regular"><span class="bar-name">Regular</span><div class="bar" id="bar-regular"></div></div>
         <input type="range" id="sl-range" class="sl-range" min="0" max="999" step="1" value="0" aria-label="Slide Ten time">
       </div>
       <p class="note">Drag the slider or use the arrow keys. The other two bars follow to the same moment. Tap Now to go back to live time.</p>

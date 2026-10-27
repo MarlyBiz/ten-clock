@@ -211,3 +211,8 @@ export function ringBands(n, outer = 196, inner = 50, gap = 3) {
   const w = (outer - inner) / n;
   return Array.from({ length: n }, (_, i) => ({ rOuter: outer - i * w, rInner: outer - (i + 1) * w + gap, width: w - gap }));
 }
+
+/** Hand extent for a One-dial ring: stays inside its own band; the innermost ring's hand starts at the hub. */
+export function ringHand(band, innermost) {
+  return { r1: innermost ? 0 : band.rInner + 2, r2: band.rOuter - band.width * 0.12 };
+}

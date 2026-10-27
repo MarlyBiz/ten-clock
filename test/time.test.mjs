@@ -151,4 +151,12 @@ test('One dial geometry: 24h ring orientation and ring bands', () => {
   assert.equal(one.length, 1); assert.equal(one[0].rOuter, 196); assert.equal(one[0].rInner, 53); // one ring fills the dial
   assert.equal(three.length, 3); assert.ok(three[0].rOuter > three[1].rOuter && three[1].rOuter > three[2].rOuter);
   for (let i = 1; i < 3; i++) assert.ok(three[i].rOuter <= three[i - 1].rInner); // no overlap
+  // Hands stay inside their own ring (outer Shared, middle Meridian, inner 24h from the hub)
+  three.forEach((b, i) => {
+    const h = T.ringHand(b, i === 2);
+    assert.ok(h.r2 <= b.rOuter && h.r2 > b.rInner, `hand ${i} tip inside its band`);
+    if (i < 2) assert.ok(h.r1 >= b.rInner && h.r1 < h.r2, `hand ${i} starts inside its band`);
+    if (i < 2) assert.ok(h.r1 > three[i + 1].rOuter, `hand ${i} never reaches the ring inside it`);
+  });
+  assert.equal(T.ringHand(three[2], true).r1, 0);
 });

@@ -267,7 +267,7 @@ function slowUpdate(now, sh) {
 
 /* ---------- One dial: concentric rings (outer Shared Ten, middle 24h, inner Meridian) ---------- */
 const VIEW_KEY = 'ten.view.v1', RINGS_KEY = 'ten.rings.v1';
-const RING_ORDER = ['shared', 'regular', 'exact'];
+const RING_ORDER = ['shared', 'exact', 'regular']; // outer -> inner
 let view = 'one';
 let rings = { shared: true, regular: true, exact: true };
 try {
@@ -326,14 +326,14 @@ function buildCombo() {
     const rise = el('circle', { class: 'd-sun', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
     const set = el('circle', { class: 'd-sun set', r: sr, cx: 0, cy: -rS, visibility: 'hidden' }, g);
     comboParts.sun[k] = { dayArc, rise, set, R: rS };
-    comboParts.hands[k] = { len: rO - w * 0.42 };
+    comboParts.hands[k] = T.ringHand(bands[i], i === on.length - 1);
   });
   // hands on top, outer ring's (Shared) drawn last so it is most prominent
   [...on].reverse().forEach((k) => {
-    const len = comboParts.hands[k].len;
+    const { r1, r2 } = comboParts.hands[k];
     const gh = el('g', { class: `c-hand ${k}` }, combo);
-    el('line', { x1: 0, y1: 12, x2: 0, y2: -len }, gh);
-    el('circle', { cx: 0, cy: -len, r: k === 'shared' ? 5 : 4 }, gh);
+    el('line', { x1: 0, y1: r1 ? -r1 : 10, x2: 0, y2: -r2 }, gh);
+    el('circle', { cx: 0, cy: -r2, r: k === 'shared' ? 5 : 4 }, gh);
     comboParts.hands[k].g = gh;
   });
   if (rings.shared) { // smooth Ten-second sweep dot on the outer edge
