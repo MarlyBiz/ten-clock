@@ -257,3 +257,44 @@ body > *:not(#sky) { position: relative; z-index: 1; }
 @media (prefers-reduced-motion: reduce) {
   #sky { /* still paints; JS skips twinkle/cloud drift */ }
 }
+
+/* Solar noon marker on slider bars */
+.noon-mark {
+  position: absolute; top: -7px; width: 14px; height: 14px; margin-left: -7px;
+  border-radius: 50%; background: #ffe566; border: 2px solid #1a1030;
+  box-shadow: 0 0 0 1px #ffb84d, 0 0 8px rgba(255, 220, 100, .85);
+  cursor: pointer; z-index: 2;
+}
+.noon-mark::after {
+  content: ""; position: absolute; left: 50%; top: 100%; width: 2px; height: 22px;
+  margin-left: -1px; background: rgba(255, 229, 102, .7);
+}
+.noon-mark:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+#sl-noon { text-align: center; color: #ffd27a; min-height: 1.2em; }
+
+/* Master time slider under the dial */
+.master { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.master-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; }
+.master-head .eyebrow { margin: 0; margin-right: auto; }
+.master-big { margin: 4px 0 0; text-align: center; font-size: clamp(1.6rem, 7vw, 2.2rem); font-weight: 300; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.master-track-wrap { position: relative; margin: 10px 0 4px; padding-bottom: 4px; }
+.master-bar { height: 18px; border-radius: 6px; background: var(--night); position: relative; overflow: visible; }
+.master-range {
+  position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+  width: 100%; height: 36px; margin: 0; background: transparent;
+  -webkit-appearance: none; appearance: none; cursor: pointer; touch-action: none;
+}
+.master-range::-webkit-slider-runnable-track { height: 36px; background: transparent; }
+.master-range::-moz-range-track { height: 36px; background: transparent; }
+.master-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 28px; height: 28px; margin-top: 4px; border-radius: 50%;
+  background: var(--accent2); border: 3px solid #1a1030; box-shadow: 0 0 0 2px var(--accent2);
+}
+.master-range::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 50%; background: var(--accent2);
+  border: 3px solid #1a1030; box-shadow: 0 0 0 2px var(--accent2);
+}
+.master-hint { text-align: center; }
+.master-edge { display: none; }
+body.previewing .master { border-color: rgba(143,184,255,.45); }
+body.previewing .master-big { color: #b9d2ff; }

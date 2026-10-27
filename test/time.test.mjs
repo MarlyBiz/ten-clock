@@ -194,3 +194,14 @@ test('Sky: sun altitude and moon phase sanity', () => {
   assert.ok(fm.frac > 0.85, `full frac ${fm.frac}`);
   assert.ok(nm.frac < 0.15, `new frac ${nm.frac}`);
 });
+
+test('Solar noon lies between sunrise and sunset (Walled Lake)', () => {
+  const s = T.sunTimes(2026, 6, 21, 42.538, -83.481);
+  assert.ok(s.noon && s.sunrise && s.sunset);
+  assert.ok(s.noon > s.sunrise && s.noon < s.sunset, 'noon between rise and set');
+  // ~17:36 UTC on June 21 for Walled Lake
+  close(s.noon.getTime(), Date.parse('2026-06-21T17:36:00Z'), 3 * 60000, 'June solar noon');
+  const sc = T.skyScene(s.noon, 42.538, -83.481);
+  assert.ok(sc.y > 0.85, `sun near top of sky at noon (y=${sc.y})`);
+  assert.ok(Math.abs(sc.x) < 0.35, `sun near centre at noon (x=${sc.x})`);
+});

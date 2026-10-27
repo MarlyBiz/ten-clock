@@ -83,6 +83,24 @@
           </div>
         </div>
       </div>
+      <div class="master" aria-label="Master time preview">
+        <div class="master-head">
+          <span class="eyebrow">Master time</span>
+          <div class="seg" role="group" aria-label="Preview range">
+            <button type="button" data-mrange="24" aria-pressed="true">24h</button>
+            <button type="button" data-mrange="48" aria-pressed="false">48h</button>
+          </div>
+          <button type="button" class="btn ghost small" id="master-now" aria-pressed="true">Now</button>
+        </div>
+        <p class="master-big" id="master-big" aria-hidden="true">—</p>
+        <p class="note" id="master-sub"></p>
+        <div class="master-track-wrap">
+          <div class="bar master-bar" id="master-bar"></div>
+          <input type="range" id="master-range" class="master-range" min="0" max="1439" step="5" value="0" aria-label="Preview time of day">
+        </div>
+        <p class="note" id="master-noon"></p>
+        <p class="note master-hint">Scrubs the dials, readouts, sky and converter together. Starts at local midnight. Tap Now to return to live time.</p>
+      </div>
     </section>
 
     <!-- Slide time -->
@@ -106,7 +124,8 @@
         <div class="bar-row" data-scale="regular"><span class="bar-name">Regular</span><div class="bar" id="bar-regular"></div></div>
         <input type="range" id="sl-range" class="sl-range" min="0" max="999" step="1" value="0" aria-label="Slide Ten time">
       </div>
-      <p class="note">Drag to move the sky and the digital times below — the dials keep showing now. The other two bars follow. Tap Now to snap the sky back.</p>
+      <p class="note" id="sl-noon"></p>
+      <p class="note">Drag to move the sky and the digital times below — the dials keep showing now. The other two bars follow. Tap a solar-noon mark or Now to jump.</p>
     </section>
 
     <!-- Location (for Meridian and real sunrise/sunset) -->

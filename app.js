@@ -230,7 +230,8 @@ const set = (id, text) => { if (last[id] !== text) { last[id] = text; $(id).text
 let lastLive = '', lastSecond = -1;
 
 function frame() {
-  const now = new Date();
+  const wall = new Date();
+  const now = masterClock(wall); // live wall time, or master preview instant
   const smooth = !reduceMotion.matches;
 
   // 1. Shared (authority)
@@ -249,6 +250,7 @@ function frame() {
 
   const sec = Math.floor(sh);
   if (sec !== lastSecond) { lastSecond = sec; slowUpdate(now, sh); }
+  if (MASTER.live) masterTick(wall);
   requestAnimationFrame(frame);
 }
 
@@ -627,6 +629,114 @@ installBtn.addEventListener('click', async () => {
 });
 refreshInstall();
 
+
+/* ---------- Master time slider (scrubs dials + sky + converter together) ---------- */
+const MASTER = { live: true, hours: 24, instant: new Date() };
+const MRANGE_KEY = 'ten.masterRange.v1';
+try { if (localStorage.getItem(MRANGE_KEY) === '48') MASTER.hours = 48; } catch { /* ignore */ }
+const masterRange = $('master-range');
+const masterBar = $('master-bar');
+
+/** Local midnight (civil) for a Date. */
+const localMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+/** Master preview clock: live wall time, or frozen preview instant. */
+const masterClock = (wall = new Date()) => (MASTER.live ? wall : MASTER.instant);
+
+function masterStart(wall = new Date()) {
+  return localMidnight(wall); // range starts at local midnight today
+}
+function masterSyncRange(wall = new Date()) {
+  const start = masterStart(wall);
+  const end = start.getTime() + MASTER.hours * 3600 * 1000;
+  const max = MASTER.hours * 60; // minutes
+  masterRange.max = String(max - (MASTER.hours === 24 ? 1 : 0)); // 0..1439 or 0..2879
+  masterRange.step = '5';
+  if (MASTER.live) {
+    const mins = Math.min(max - 1, Math.max(0, Math.round((wall.getTime() - start.getTime()) / 60000)));
+    masterRange.value = String(Math.round(mins / 5) * 5);
+  } else {
+    const mins = Math.min(max - 1, Math.max(0, Math.round((MASTER.instant.getTime() - start.getTime()) / 60000)));
+    masterRange.value = String(Math.round(mins / 5) * 5);
+  }
+  document.querySelectorAll('[data-mrange]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.mrange === MASTER.hours)));
+  paintMasterBar(wall);
+}
+function paintMasterBar(wall = new Date()) {
+  const start = masterStart(wall);
+  masterBar.replaceChildren();
+  // day/night bands + rise/set/noon for each civil day in range
+  const p = sunPlace(wall);
+  for (let day = 0; day < Math.ceil(MASTER.hours / 24); day++) {
+    const d0 = new Date(start.getFullYear(), start.getMonth(), start.getDate() + day);
+    const st = T.sunTimes(d0.getFullYear(), d0.getMonth() + 1, d0.getDate(), p.lat, p.lon);
+    if (!st.sunrise || !st.sunset) continue;
+    const toF = (dt) => (dt.getTime() - start.getTime()) / (MASTER.hours * 3600000);
+    const a = Math.max(0, Math.min(1, toF(st.sunrise))), b = Math.max(0, Math.min(1, toF(st.sunset)));
+    if (b > a) { const seg = div('seg-day', masterBar, a); seg.style.width = `${(b - a) * 100}%`; }
+    div('sun', masterBar, a); div('sun set', masterBar, b);
+    if (st.noon) {
+      const nf = toF(st.noon);
+      if (nf >= 0 && nf <= 1) {
+        const mk = div('noon-mark', masterBar, nf);
+        mk.title = 'Solar noon — tap to preview';
+        mk.addEventListener('click', () => masterJump(st.noon));
+      }
+    }
+  }
+  // end labels
+  const left = document.createElement('span'); left.className = 'master-edge'; left.textContent = 'midnight';
+  masterBar.appendChild(left);
+}
+function masterJump(date) {
+  MASTER.live = false; MASTER.instant = new Date(date.getTime());
+  SL.live = false; SL.instant = new Date(date.getTime()); skySliding = true;
+  masterSyncRange(); masterRender(); syncRange(); sliderRender(); paintSky(MASTER.instant, true);
+  lastSecond = -1;
+  slowUpdate(MASTER.instant, T.sharedTen(MASTER.instant));
+}
+function masterRender() {
+  const d = masterClock();
+  const h24 = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const h12s = t12en.format(d).replace(/\u202f|\s/g, ' ');
+  set('master-big', hourFmt === '24' ? h24 : h12s);
+  set('master-sub', MASTER.live ? 'Live' : `Preview · ${civilDateFmt.format(d)} · ${MASTER.hours}h from local midnight`);
+  if (SL.noon?.regular?.at) {
+    set('master-noon', `Solar noon ${tradHM(SL.noon.regular.at)}`);
+  }
+  $('master-now').setAttribute('aria-pressed', String(MASTER.live));
+  $('master-now').textContent = MASTER.live ? 'Live' : 'Now';
+  document.body.classList.toggle('previewing', !MASTER.live);
+}
+function masterTick(wall) {
+  masterSyncRange(wall);
+  masterRender();
+}
+masterRange.addEventListener('pointerdown', () => { skySliding = true; });
+masterRange.addEventListener('input', () => {
+  const start = masterStart();
+  const mins = +masterRange.value;
+  MASTER.live = false;
+  MASTER.instant = new Date(start.getTime() + mins * 60000);
+  SL.live = false; SL.instant = new Date(MASTER.instant.getTime()); skySliding = true;
+  masterRender(); syncRange(); sliderRender(); paintSky(MASTER.instant, true);
+  lastSecond = -1;
+  const sh = T.sharedTen(MASTER.instant);
+  slowUpdate(MASTER.instant, sh); // dials + Combined/Separate readouts follow immediately
+});
+$('master-now').addEventListener('click', () => {
+  MASTER.live = true; SL.live = true; skySliding = false;
+  const wall = new Date();
+  SL.instant = wall; MASTER.instant = wall;
+  masterSyncRange(wall); masterRender(); syncRange(); sliderRender(); paintSky(wall, true);
+  lastSecond = -1;
+});
+document.querySelectorAll('[data-mrange]').forEach((b) => b.addEventListener('click', () => {
+  MASTER.hours = +b.dataset.mrange;
+  try { localStorage.setItem(MRANGE_KEY, String(MASTER.hours)); } catch { /* ignore */ }
+  masterSyncRange(); masterRender();
+}));
+
+
 /* ---------- Slide time: three linked bars, one slider ---------- */
 const SL = { drive: 'shared', live: true, instant: new Date(), sun: null };
 const DRIVE_KEY = 'ten.slideBy.v1';
@@ -674,15 +784,47 @@ function paintSun() {
     regular: s.sunrise && [T.localSecondsOfDay(s.sunrise) / 86400, T.localSecondsOfDay(s.sunset) / 86400],
     exact: se.sunrise && [T.exactTen(se.sunrise, lon) / 1e5, T.exactTen(se.sunset, lon) / 1e5],
   };
+  const noons = {
+    shared: s.noon && { f: T.sharedTen(s.noon) / 1e5, at: s.noon },
+    regular: s.noon && { f: T.localSecondsOfDay(s.noon) / 86400, at: s.noon },
+    exact: se.noon && { f: T.exactTen(se.noon, lon) / 1e5, at: se.noon },
+  };
+  SL.noon = noons;
   for (const [name, bar] of Object.entries(bars)) {
-    bar.querySelectorAll('.seg-day, .sun').forEach((n) => n.remove());
-    const sp = spans[name]; if (!sp) continue;
-    const [a, b] = sp;
-    const seg = (l, r) => { const d = div('seg-day', bar, l); d.style.width = `${(r - l) * 100}%`; bar.insertBefore(d, bar.firstChild); };
-    if (a <= b) seg(a, b); else { seg(a, 1); seg(0, b); } // wraps across 0
-    div('sun', bar, a); div('sun set', bar, b);
-    bar.appendChild(bar._mk); // keep marker on top
+    bar.querySelectorAll('.seg-day, .sun, .noon-mark').forEach((n) => n.remove());
+    const sp = spans[name];
+    if (sp) {
+      const [a, b] = sp;
+      const seg = (l, r) => { const d = div('seg-day', bar, l); d.style.width = `${(r - l) * 100}%`; bar.insertBefore(d, bar.firstChild); };
+      if (a <= b) seg(a, b); else { seg(a, 1); seg(0, b); }
+      div('sun', bar, a); div('sun set', bar, b);
+    }
+    const n = noons[name];
+    if (n) {
+      const mk = div('noon-mark', bar, n.f);
+      mk.title = 'Solar noon — tap to go there';
+      mk.setAttribute('role', 'button'); mk.tabIndex = 0;
+      const go = () => jumpToSolarNoon(name);
+      mk.addEventListener('click', go);
+      mk.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+    }
+    bar.appendChild(bar._mk);
   }
+  // Label under the bars in each scale's units
+  if (s.noon) {
+    const tenN = T.formatTen(T.sharedTen(s.noon));
+    const merN = se.noon ? T.formatTen(T.exactTen(se.noon, lon)) : '—';
+    const regN = tradHM(s.noon);
+    set('sl-noon', `Solar noon · Regular ${regN} · Ten ${tenN} · Meridian ${merN}`);
+  } else set('sl-noon', '');
+}
+function jumpToSolarNoon(scale) {
+  const n = SL.noon?.[scale] || SL.noon?.regular || SL.noon?.shared;
+  if (!n?.at) return;
+  SL.live = false; skySliding = true;
+  SL.instant = new Date(n.at.getTime());
+  // Keep the chosen drive; sync range to this instant
+  syncRange(); sliderRender(); paintSky(SL.instant, true);
 }
 
 function placeRange() {
@@ -796,7 +938,7 @@ function applyFmt() {
   sunKey = ''; lastSecond = -1;
   tradDial.refreshLabels();
   if (typeof buildCombo === 'function') buildCombo();
-  buildBars(); sliderRender();
+  buildBars(); sliderRender(); masterSyncRange(); masterRender();
 }
 document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('click', () => {
   hourFmt = b.dataset.fmt;
@@ -807,6 +949,7 @@ applyFmt();
 
 buildCombo();
 renderLocUI();
+masterSyncRange(); masterRender();
 resizeSky(); paintSky(new Date(), true);
 requestAnimationFrame(frame);
 
