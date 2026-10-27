@@ -449,26 +449,55 @@ const skyPlace = (d) => {
   const p = sunPlace(d);
   return T.skyScene(d, p.lat, p.lon);
 };
-function resizeSky() {
+/** Stable sky size + arch layout: ignore scroll and URL-bar height churn. */
+let skyLayoutCache = null; // { peakY, hy, cardTop, band, forW }
+let skySizeW = 0, skySizeH = 0;
+function resizeSky(force = false) {
   const dpr = Math.min(devicePixelRatio || 1, 2);
-  const vv = window.visualViewport;
-  skyW = Math.round(vv?.width || innerWidth);
-  skyH = Math.round(vv?.height || innerHeight);
+  // Width from layout viewport (not visualViewport — that shifts with scroll/URL bar)
+  const w = Math.round(window.innerWidth || document.documentElement.clientWidth || 0);
+  // Height from CSS 100lvh (large viewport). Never shrink for transient chrome.
+  skyCv.style.width = '100%';
+  skyCv.style.height = '100lvh';
+  skyCv.style.minHeight = '100lvh';
+  skyCv.style.transform = '';
+  const laid = Math.round(skyCv.getBoundingClientRect().height || window.innerHeight || 0);
+  let h = Math.max(laid, Math.round(window.innerHeight || 0), skySizeH || 0);
+  if (!force && skySizeW && Math.abs(w - skySizeW) < 2) {
+    // Height-only change (URL bar show/hide): keep canvas; do not relayout arch
+    if (h <= skySizeH + 2) return false;
+  }
+  const widthChanged = !skySizeW || Math.abs(w - skySizeW) >= 2;
+  skyW = w; skyH = h; skySizeW = w; skySizeH = h;
   skyCv.width = Math.round(skyW * dpr); skyCv.height = Math.round(skyH * dpr);
-  skyCv.style.width = skyW + 'px'; skyCv.style.height = skyH + 'px';
+  // Keep CSS lvh sizing (don't lock a shrinking px height)
+  skyCv.style.width = '100%';
+  skyCv.style.height = '100lvh';
   skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (widthChanged || force || !skyLayoutCache) measureSkyLayout(true);
+  return true;
 }
-/** Dial midline (horizon) and peak Y in the clear band above the first card. */
-function skyLayout() {
+/** Card-top in document space → stable vs scroll (equals viewport Y at scrollY=0). */
+function measureSkyLayout(force = false) {
   const hero = document.querySelector('.card.hero');
-  const vh = window.visualViewport?.height || skyH;
-  const cardTop = hero ? Math.max(0, hero.getBoundingClientRect().top) : 100;
-  // Simulation arch lives entirely in the clear top band so sun/moon are never
-  // trapped behind frosted cards. Peak near the top; horizon just above the card.
+  const w = skyW || Math.round(innerWidth);
+  if (!force && skyLayoutCache && skyLayoutCache.forW === w) return skyLayoutCache;
+  // offsetTop chain is scroll-independent; fall back to rect+scrollY
+  let cardTop = 100;
+  if (hero) {
+    let y = 0, el = hero;
+    while (el) { y += el.offsetTop; el = el.offsetParent; }
+    if (!(y > 0)) y = Math.max(0, hero.getBoundingClientRect().top + (window.scrollY || 0));
+    cardTop = Math.max(48, Math.min(y, (skyH || 600) * 0.45));
+  }
   const band = Math.max(56, cardTop);
   const peakY = Math.max(18, Math.min(band * 0.42, band - 36));
-  const hy = Math.max(peakY + 40, cardTop - 6); // arch feet just above / at card top
-  return { hy, peakY, cardTop, band };
+  const hy = Math.max(peakY + 40, cardTop - 6);
+  skyLayoutCache = { hy, peakY, cardTop, band, forW: w };
+  return skyLayoutCache;
+}
+function skyLayout() {
+  return skyLayoutCache || measureSkyLayout(true);
 }
 function skyColors(alt) {
   // alt in degrees; blend dawn/day/sunset/night
@@ -663,9 +692,21 @@ function paintSky(date, force = false) {
   document.documentElement.style.setProperty('--bg1', cols[0]);
   document.documentElement.style.setProperty('--bg2', cols[2]);
 }
-const onSkyResize = () => { resizeSky(); lastSky = 0; paintSky((typeof SL !== 'undefined' && SL.instant) || new Date(), true); };
+function onSkyResize() {
+  // Ignore height-only visualViewport churn (URL bar / scroll). Only act on real size changes.
+  const changed = resizeSky(false);
+  if (!changed) return;
+  lastSky = 0;
+  const d = (typeof masterClock === 'function') ? masterClock() : ((typeof SL !== 'undefined' && SL.instant) || new Date());
+  paintSky(d, true); // immediate — no 1s idle lag
+}
 addEventListener('resize', onSkyResize);
-visualViewport?.addEventListener('resize', onSkyResize);
+addEventListener('orientationchange', () => {
+  skySizeW = 0; skySizeH = 0; skyLayoutCache = null;
+  // after rotation settles
+  setTimeout(() => { resizeSky(true); lastSky = 0; paintSky(masterClock?.() || new Date(), true); }, 200);
+});
+// Do NOT listen to visualViewport resize/scroll — those fire on URL bar and scroll.
 
 
 /* ---------- Install (PWA) ---------- */

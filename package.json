@@ -1,0 +1,28 @@
+{
+  "name": "ten-clock",
+  "version": "1.0.0",
+  "description": "A perfectly even **10-hour clock** where the **new day begins at sunset**. It's Mark Athanson's idea, and \"Ten\" is a working title.",
+  "main": "app.js",
+  "directories": {
+    "test": "test"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  },
+  "scripts": {
+    "test": "node --test test/time.test.mjs",
+    "test:sky": "node test/sky-scroll.spec.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MarlyBiz/ten-clock.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/MarlyBiz/ten-clock/issues"
+  },
+  "homepage": "https://github.com/MarlyBiz/ten-clock#readme"
+}
