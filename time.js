@@ -160,6 +160,113 @@ export function sunTimes(y, m, d, latDeg, lonDeg) {
   return { sunrise: rise.date, sunset: set.date, noon: noon.date, polar: rise.polar || set.polar };
 }
 
+/**
+ * On-device sun calendar for a civil year at lat/lon (NOAA 90.833° zenith).
+ * Equal day/night ≈ 12h daylight; EOT zeros = sun on Meridian noon; solstices by day length.
+ * Southern hemisphere: longest/shortest fall out of the scan (Dec/Jun swapped).
+ */
+export function sunCalendar(year, latDeg, lonDeg, now = new Date()) {
+  const days = [];
+  let polarDays = 0;
+  for (let m = 1; m <= 12; m++) {
+    for (let d = 1; d <= 31; d++) {
+      const probe = new Date(year, m - 1, d);
+      if (probe.getMonth() !== m - 1) continue;
+      const st = sunTimes(year, m, d, latDeg, lonDeg);
+      // EOT at ~17:00 UTC ≈ midday US — stable enough for zero crossings
+      const eot = solarAt(julianDate(new Date(Date.UTC(year, m - 1, d, 17)))).eot;
+      if (!st.sunrise || !st.sunset) {
+        polarDays++;
+        days.push({ y: year, m, d, len: null, eot, rise: null, set: null, polar: st.polar });
+        continue;
+      }
+      const len = (st.sunset.getTime() - st.sunrise.getTime()) / 3.6e6;
+      days.push({ y: year, m, d, len, eot, rise: st.sunrise, set: st.sunset, polar: null });
+    }
+  }
+  const lit = days.filter((x) => x.len != null);
+  const southHem = latDeg < 0;
+  const notes = {};
+  if (lit.length < 20) notes.polar = 'No sunrise/sunset for much of the year here.';
+  if (lit.length >= 2) {
+    const lens = lit.map((x) => x.len);
+    const span = Math.max(...lens) - Math.min(...lens);
+    if (Math.abs(latDeg) < 5 || span < 0.4) notes.equator = 'Day length stays near 12h year-round here.';
+  }
+
+  // Equal day/night: two dates closest to 12h, one in each half-year when possible
+  let equal = [];
+  if (lit.length && !notes.equator) {
+    const spring = lit.filter((x) => x.m <= 6).sort((a, b) => Math.abs(a.len - 12) - Math.abs(b.len - 12))[0];
+    const autumn = lit.filter((x) => x.m >= 7).sort((a, b) => Math.abs(a.len - 12) - Math.abs(b.len - 12))[0];
+    equal = [spring, autumn].filter(Boolean).sort((a, b) => a.m - b.m || a.d - b.d);
+    if (equal.length < 2) {
+      equal = [...lit].sort((a, b) => Math.abs(a.len - 12) - Math.abs(b.len - 12)).slice(0, 2)
+        .sort((a, b) => a.m - b.m || a.d - b.d);
+    }
+  }
+
+  // EOT zeros: sign changes (or exact 0)
+  const eotZero = [];
+  for (let i = 1; i < days.length; i++) {
+    const a = days[i - 1].eot, b = days[i].eot;
+    if (a === 0 || a * b < 0 || (a * b === 0 && b === 0)) {
+      const pick = Math.abs(a) <= Math.abs(b) ? days[i - 1] : days[i];
+      if (!eotZero.length || pick.m !== eotZero[eotZero.length - 1].m || pick.d !== eotZero[eotZero.length - 1].d)
+        eotZero.push(pick);
+    }
+  }
+
+  let eotMax = null, eotMin = null;
+  for (const x of days) {
+    if (!eotMax || x.eot > eotMax.eot) eotMax = x;
+    if (!eotMin || x.eot < eotMin.eot) eotMin = x;
+  }
+
+  let longest = null, shortest = null;
+  for (const x of lit) {
+    if (!longest || x.len > longest.len) longest = x;
+    if (!shortest || x.len < shortest.len) shortest = x;
+  }
+
+  const pack = (x, kind) => x && ({
+    kind, y: x.y, m: x.m, d: x.d,
+    len: x.len, eot: x.eot, rise: x.rise, set: x.set, polar: x.polar || null,
+  });
+
+  const events = [];
+  for (const x of equal) events.push(pack(x, 'equal'));
+  for (const x of eotZero) events.push(pack(x, 'eotZero'));
+  if (longest) events.push(pack(longest, 'longest'));
+  if (shortest) events.push(pack(shortest, 'shortest'));
+
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const withDays = events.map((e) => {
+    let t = new Date(e.y, e.m - 1, e.d).getTime();
+    let inDays = Math.round((t - start) / 86400000);
+    let y = e.y;
+    if (inDays < 0) {
+      // roll to next year same month/day for "next" hint
+      t = new Date(now.getFullYear() + 1, e.m - 1, e.d).getTime();
+      inDays = Math.round((t - start) / 86400000);
+      y = now.getFullYear() + 1;
+    }
+    return { ...e, y, inDays };
+  }).sort((a, b) => a.inDays - b.inDays);
+  const next = withDays[0] || null;
+
+  return {
+    year, southHem, notes,
+    equal: equal.map((x) => pack(x, 'equal')),
+    eotZero: eotZero.map((x) => pack(x, 'eotZero')),
+    eotMax: pack(eotMax, 'eotMax'),
+    eotMin: pack(eotMin, 'eotMin'),
+    longest: pack(longest, 'longest'),
+    shortest: pack(shortest, 'shortest'),
+    next,
+  };
+}
+
 /** Approximate centre longitude of the browser's standard time zone (no DST). */
 export function zoneCentreLongitude(date = new Date()) {
   const y = date.getFullYear();

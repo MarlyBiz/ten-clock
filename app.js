@@ -947,6 +947,90 @@ $('sl-now').addEventListener('click', () => { SL.live = true; sliderTick(new Dat
 addEventListener('resize', placeRange);
 buildBars();
 
+
+/* ---------- Sun Calendar (on-device) ---------- */
+const SC_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const scDate = (e) => `${SC_MONTHS[e.m - 1]} ${e.d}`;
+const scLen = (h) => {
+  if (h == null) return '—';
+  const m = Math.round(h * 60);
+  return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+};
+/** Format a sunrise/sunset Date in the device zone — DST follows that event's own date. */
+const scHM = (d) => (d ? tradHM(d) : '—');
+let scKey = '';
+function renderSunCal(now = new Date()) {
+  const list = $('sc-list'), note = $('sc-note');
+  if (!list || !note) return;
+  const p = sunPlace(now);
+  const y = now.getFullYear();
+  const key = `${y}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}|${hourFmt}`;
+  if (key === scKey && list.childElementCount) return;
+  scKey = key;
+  const cal = T.sunCalendar(y, p.lat, p.lon, now);
+  const bits = [];
+  if (cal.notes.polar) bits.push(cal.notes.polar);
+  if (cal.notes.equator) bits.push(cal.notes.equator);
+  if (!loc) bits.push('Using your time-zone centre — set a location for your place.');
+  note.textContent = bits.join(' ');
+
+  const rows = [];
+  const isNext = (e) => cal.next && e && cal.next.kind === e.kind && cal.next.m === e.m && cal.next.d === e.d
+    || (cal.next && e && e.kind === 'equal' && cal.next.kind === 'equal' && cal.next.m === e.m && cal.next.d === e.d);
+  const hintFor = (e) => {
+    if (!cal.next || !e) return '';
+    const match = cal.next.kind === e.kind && cal.next.m === e.m && cal.next.d === e.d;
+    if (!match) return '';
+    const n = cal.next.inDays;
+    return n === 0 ? 'today' : n === 1 ? 'in 1 day' : `in ${n} days`;
+  };
+
+  if (cal.equal?.length && !cal.notes.equator) {
+    const lines = cal.equal.map((e) => {
+      const h = hintFor(e);
+      return { next: !!h, hint: h, k: 'Equal day / night',
+        v: `<b>${scDate(e)}</b> · ${scHM(e.rise)} – ${scHM(e.set)} · ${scLen(e.len)}` };
+    });
+    rows.push(...lines);
+  } else if (cal.notes.equator) {
+    rows.push({ next: false, hint: '', k: 'equal day / night', v: cal.notes.equator });
+  }
+
+  if (cal.eotZero?.length) {
+    const dates = cal.eotZero.map(scDate).join(' · ');
+    const nextE = cal.eotZero.find((e) => hintFor(e));
+    const h = nextE ? hintFor(nextE) : '';
+    const max = cal.eotMax, min = cal.eotMin;
+    const drift = (max && min)
+      ? `Max drift +${Math.round(max.eot)} min (${scDate(max)}) · ${Math.round(min.eot)} min (${scDate(min)})`
+      : '';
+    rows.push({ next: !!h, hint: h, k: 'sun on Meridian noon',
+      v: `<b>${dates}</b>${drift ? `<br>${drift}` : ''}` });
+  }
+
+  if (cal.longest && cal.shortest && !cal.notes.polar) {
+    for (const [e, label] of [[cal.longest, 'longest day'], [cal.shortest, 'shortest day']]) {
+      const h = hintFor(e);
+      rows.push({ next: !!h, hint: h, k: label,
+        v: `<b>${scDate(e)}</b> · ${scLen(e.len)} · ${scHM(e.rise)} – ${scHM(e.set)}` });
+    }
+  } else if (cal.notes.polar) {
+    rows.push({ next: false, hint: '', k: 'solstices', v: cal.notes.polar });
+  }
+
+  // Mark next across kinds: if next is eotZero, the combined row already has hint;
+  // also bump equal/longest/shortest individually.
+  list.replaceChildren();
+  for (const r of rows) {
+    const li = document.createElement('li');
+    li.className = 'sc-row' + (r.next ? ' next' : '');
+    li.innerHTML = `<span class="sc-k">${r.k}</span>`
+      + (r.hint ? `<span class="sc-hint">${r.hint}</span>` : `<span class="sc-hint"></span>`)
+      + `<span class="sc-v">${r.v}</span>`;
+    list.appendChild(li);
+  }
+}
+
 /* ---------- location UI ---------- */
 function renderLocUI() {
   $('loc-clear').hidden = !loc;
@@ -958,6 +1042,7 @@ function renderLocUI() {
     $('geo-btn').textContent = 'Set my location';
   }
   lastSecond = -1;
+  scKey = ''; renderSunCal();
 }
 $('geo-btn').addEventListener('click', () => {
   const st = $('loc-status');
@@ -989,6 +1074,7 @@ function applyFmt() {
   tradDial.refreshLabels();
   if (typeof buildCombo === 'function') buildCombo();
   buildBars(); sliderRender(); masterSyncRange(); masterRender();
+  scKey = ''; renderSunCal();
 }
 document.querySelectorAll('.seg [data-fmt]').forEach((b) => b.addEventListener('click', () => {
   hourFmt = b.dataset.fmt;

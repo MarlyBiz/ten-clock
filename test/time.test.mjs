@@ -248,3 +248,44 @@ test('New moon has near-zero illumination (glow-only draw path)', () => {
   assert.ok(m.frac < 0.06, `new moon frac ${m.frac}`);
 });
 
+
+
+test('Sun calendar Walled Lake 2026: equal days, EOT zeros, solstices (±1 day)', () => {
+  const cal = T.sunCalendar(2026, 42.538, -83.481, new Date('2026-10-26T16:00:00Z'));
+  const md = (e) => e.m * 100 + e.d;
+  const near = (got, wantM, wantD, label) => {
+    const g = new Date(2026, got.m - 1, got.d);
+    const w = new Date(2026, wantM - 1, wantD);
+    const diff = Math.abs((g - w) / 86400000);
+    assert.ok(diff <= 1, `${label}: got ${got.m}/${got.d}, want ~${wantM}/${wantD}`);
+  };
+  assert.equal(cal.equal.length, 2);
+  near(cal.equal[0], 3, 18, 'spring equal');
+  near(cal.equal[1], 9, 26, 'autumn equal');
+  assert.ok(cal.eotZero.length >= 4, `eot zeros ${cal.eotZero.length}`);
+  near(cal.eotZero[0], 4, 15, 'EOT Apr');
+  near(cal.eotZero[1], 6, 13, 'EOT Jun');
+  near(cal.eotZero[2], 9, 1, 'EOT Sep');
+  near(cal.eotZero[3], 12, 25, 'EOT Dec');
+  assert.ok(cal.eotMax.eot > 14 && cal.eotMax.eot < 18, `max EOT ${cal.eotMax.eot}`);
+  assert.ok(cal.eotMin.eot < -12 && cal.eotMin.eot > -16, `min EOT ${cal.eotMin.eot}`);
+  near(cal.longest, 6, 21, 'longest');
+  near(cal.shortest, 12, 21, 'shortest');
+  assert.ok(cal.longest.len > 15 && cal.longest.len < 15.6, `long ${cal.longest.len}`);
+  assert.ok(cal.shortest.len > 8.8 && cal.shortest.len < 9.4, `short ${cal.shortest.len}`);
+  assert.ok(cal.next && cal.next.inDays >= 0, 'next upcoming');
+  assert.equal(cal.southHem, false);
+});
+
+test('Sun times use the event date local DST offset (Detroit EDT vs EST)', () => {
+  // America/Detroit: EDT (UTC−4) in March, EST (UTC−5) in December
+  const mar = T.sunTimes(2026, 3, 18, 42.538, -83.481);
+  const dec = T.sunTimes(2026, 12, 21, 42.538, -83.481);
+  assert.ok(mar.sunrise && dec.sunrise);
+  assert.equal(mar.sunrise.getTimezoneOffset(), 240, 'March sunrise is EDT (offset 240 min)');
+  assert.equal(dec.sunrise.getTimezoneOffset(), 300, 'December sunrise is EST (offset 300 min)');
+  // Wall-clock hours differ from a fixed UTC offset: formatting must follow each date's zone
+  const h = (d) => d.getHours();
+  assert.ok(h(mar.sunrise) >= 6 && h(mar.sunrise) <= 8, `Mar rise hour ${h(mar.sunrise)}`);
+  assert.ok(h(dec.sunrise) >= 7 && h(dec.sunrise) <= 9, `Dec rise hour ${h(dec.sunrise)}`);
+});
