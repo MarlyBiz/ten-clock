@@ -441,16 +441,17 @@ const skyPlace = (d) => {
 };
 function resizeSky() {
   const dpr = Math.min(devicePixelRatio || 1, 2);
-  skyW = innerWidth; skyH = innerHeight;
+  const vv = window.visualViewport;
+  skyW = Math.round(vv?.width || innerWidth);
+  skyH = Math.round(vv?.height || innerHeight);
   skyCv.width = Math.round(skyW * dpr); skyCv.height = Math.round(skyH * dpr);
   skyCv.style.width = skyW + 'px'; skyCv.style.height = skyH + 'px';
   skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function horizonY() {
-  const el = document.querySelector('.dial-wrap .dial:not([style*="display: none"])') || $('combo') || document.querySelector('.dial');
-  if (!el) return skyH * 0.42;
-  const r = el.getBoundingClientRect();
-  return r.top + r.height / 2;
+  // Fixed in the viewport (not the dial's scrolled position), so the sky never goes pitch-black as you scroll.
+  const vh = window.visualViewport?.height || skyH;
+  return vh * 0.40;
 }
 function skyColors(alt) {
   // alt in degrees; blend dawn/day/sunset/night
@@ -547,9 +548,9 @@ function paintSky(date, force = false) {
     skyCtx.fillStyle = '#fff6c8'; skyCtx.beginPath(); skyCtx.arc(sx, sy, R, 0, Math.PI * 2); skyCtx.fill();
   }
 
-  // ground veil below horizon (keeps dial readable, hides sun/moon below)
+  // Soft ground veil: hide sun/moon below the horizon without killing the sky colour lower down the page
   const vg = skyCtx.createLinearGradient(0, hy, 0, skyH);
-  vg.addColorStop(0, 'rgba(7,11,29,.15)'); vg.addColorStop(0.35, 'rgba(7,11,29,.72)'); vg.addColorStop(1, 'rgba(7,11,29,.92)');
+  vg.addColorStop(0, 'rgba(7,11,29,.08)'); vg.addColorStop(1, 'rgba(7,11,29,.28)');
   skyCtx.fillStyle = vg; skyCtx.fillRect(0, hy, skyW, skyH - hy);
 
   // flat 3D compass — always faces the sun; flips after noon so letters stay readable
@@ -601,7 +602,9 @@ function paintSky(date, force = false) {
   document.documentElement.style.setProperty('--bg1', cols[0]);
   document.documentElement.style.setProperty('--bg2', cols[2]);
 }
-addEventListener('resize', () => { resizeSky(); lastSky = 0; paintSky((typeof SL !== 'undefined' && SL.instant) || new Date(), true); });
+const onSkyResize = () => { resizeSky(); lastSky = 0; paintSky((typeof SL !== 'undefined' && SL.instant) || new Date(), true); };
+addEventListener('resize', onSkyResize);
+visualViewport?.addEventListener('resize', onSkyResize);
 
 
 /* ---------- Install (PWA) ---------- */
