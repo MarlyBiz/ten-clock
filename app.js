@@ -883,8 +883,8 @@ function openTimeEdit(host) {
     }
   };
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
-    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
     else input.classList.remove('invalid');
   });
   input.addEventListener('blur', () => {
@@ -908,7 +908,8 @@ function bindTimeEdits() {
     });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
-        if (timeEditId === id) return;
+        if (e.target.closest('.time-edit-wrap')) return;
+        if (timeEditId) return;
         e.preventDefault();
         openTimeEdit(el);
       }
