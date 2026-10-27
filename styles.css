@@ -213,3 +213,10 @@ b { font-weight: 600; }
 .legend-note .sun-dot { margin-left: 8px; }
 .zero-key { display: inline-block; width: 9px; height: 9px; background: #fff; transform: rotate(45deg) scaleX(.75); margin: 0 6px 0 12px; }
 .seg button { white-space: nowrap; }
+
+/* AM/PM halves on traditional dials */
+.half-pm, .half-am { fill: none; }
+.half-pm { stroke: rgba(255,184,107,.13); }
+.half-am { stroke: rgba(143,184,255,.15); }
+.r-ampm.pm, .a-ampm.pm { fill: #ffcf99; } .r-ampm.am, .a-ampm.am { fill: #b9d2ff; }
+.a-ampm { font-size: 10px; font-weight: 700; letter-spacing: .08em; text-anchor: middle; dominant-baseline: central; }

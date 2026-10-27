@@ -64,6 +64,13 @@ function buildTenDial(svg, { labels = true } = {}) {
     setHands(total) { rot(h, (total / 100000) * 360); rot(m, ((total % 10000) / 10000) * 360); rot(s, ((total % 100) / 100) * 360); } };
 }
 
+/** AM/PM half-ring tints for a noon-at-top traditional dial (PM = right half, AM = left half). */
+function ampmHalves(svg, r, sw) {
+  el('path', { class: 'half-pm', d: `M0 ${-r}A${r} ${r} 0 0 1 0 ${r}`, 'stroke-width': sw }, svg);
+  el('path', { class: 'half-am', d: `M0 ${r}A${r} ${r} 0 0 1 0 ${-r}`, 'stroke-width': sw }, svg);
+}
+const h12 = (h) => h % 12 || 12;
+
 /** 24-hour analogue dial: noon at top, midnight at bottom (like a sun dial). */
 const R24 = 86;
 const turns24 = T.regularDialTurns; // 12:00 -> 0 turns (top), midnight at bottom
@@ -76,9 +83,14 @@ function build24Dial(svg) {
     const [x1, y1] = polar(hr ? 75 : 78, i / 96), [x2, y2] = polar(81, i / 96);
     el('line', { class: `a-tick${hr ? ' hour' : ''}`, x1, y1, x2, y2 }, svg);
   }
+  ampmHalves(svg, 64, 24);
   for (let h = 0; h < 24; h++) {
     const [x, y] = polar(64, turns24(h * 3600));
-    el('text', { class: `a-num${h % 6 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y }, svg).textContent = h;
+    el('text', { class: `a-num${h % 12 === 0 ? ' major' : h % 2 ? ' odd' : ''}`, x, y }, svg).textContent = h12(h);
+  }
+  for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
+    const [x, y] = polar(42, turns24(hr * 3600));
+    el('text', { class: `a-ampm ${lab.toLowerCase()}`, x, y }, svg).textContent = lab;
   }
   const rise = el('circle', { class: 'd-sun', r: 4.5, cx: 0, cy: -R24 }, svg);
   const setS = el('circle', { class: 'd-sun set', r: 4.5, cx: 0, cy: -R24 }, svg);
@@ -288,7 +300,7 @@ function buildCombo() {
   on.forEach((k, i) => {
     const { rOuter: rO, width: w } = bands[i];
     const g = el('g', { class: `ring ${k}` }, combo);
-    el('circle', { class: 'r-band', r: rO - w / 2, 'stroke-width': w }, g);
+    if (k === 'regular') ampmHalves(g, rO - w / 2, w); else el('circle', { class: 'r-band', r: rO - w / 2, 'stroke-width': w }, g);
     const rS = rO - w * 0.17, sw = Math.min(w * 0.26, 22);
     el('circle', { class: 'r-night', r: rS, 'stroke-width': sw }, g);
     const dayArc = el('path', { class: 'r-day', d: '', 'stroke-width': sw }, g);
@@ -308,15 +320,15 @@ function buildCombo() {
         el('text', { class: `r-num${h === 0 ? ' zero' : ''}`, x, y, 'font-size': fs }, g).textContent = h;
       }
     } else {
-      const all = w >= 70, fs = Math.min(15, w * (all ? 0.2 : 0.27));
-      for (let h = 0; h < 24; h += all ? 1 : 2) {
+      const fs = Math.min(15, w * 0.23);
+      for (let h = 0; h < 24; h++) { // 12-hour numbers, one revolution per day
         const [x, y] = polar(rN, turns24(h * 3600));
-        el('text', { class: `r-num${h % 6 === 0 ? ' major' : ''}`, x, y, 'font-size': fs }, g).textContent = h;
+        el('text', { class: `r-num${h % 12 === 0 ? ' major' : ''}`, x, y, 'font-size': fs }, g).textContent = h12(h);
       }
       const fa = Math.max(7, Math.min(11, w * 0.15));
       for (const [lab, hr] of [['PM', 15], ['AM', 9]]) {
         const [x, y] = polar(rO - w * 0.9, turns24(hr * 3600));
-        el('text', { class: 'r-ampm', x, y, 'font-size': fa }, g).textContent = lab;
+        el('text', { class: `r-ampm ${lab.toLowerCase()}`, x, y, 'font-size': fa }, g).textContent = lab;
       }
     }
     // fixed day-start mark (Ten 0 = 6 PM): a white diamond on the band edge — distinct from the sun dots

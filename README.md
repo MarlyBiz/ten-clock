@@ -21,7 +21,7 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 | `styles.css` | Night-sky theme, responsive from 360px up |
 | `app.js` | Builds the SVG dials and runs the `requestAnimationFrame` loop, location UI and sky gradient |
 | `time.js` | Pure ES module with all the math: Ten conversions, Ten date, LMST, GMST/LST, NOAA sun, equation of time |
-| `sw.js` | Optional, versioned offline cache (`ten-v5`). Bump it on changes |
+| `sw.js` | Optional, versioned offline cache (`ten-v6`). Bump it on changes |
 | `favicon.svg` | Icon (also used by the PWA manifest) |
 | `manifest.webmanifest` | Installable PWA manifest |
 | `_headers` | Cloudflare Pages security and cache headers (strict CSP, no third parties) |
