@@ -431,7 +431,7 @@ document.querySelectorAll('.ring-sw').forEach((b) => b.addEventListener('click',
 applyView();
 
 
-/* ---------- Animated sky (sun/moon/compass/stars/clouds); follows slider instant ---------- */
+/* ---------- Animated sky (sun/moon/stars/clouds); follows slider instant ---------- */
 const skyCv = $('sky'), skyCtx = skyCv.getContext('2d', { alpha: false });
 const moonImg = new Image();
 moonImg.decoding = 'async';
@@ -656,51 +656,6 @@ function paintSky(date, force = false) {
   const vg = skyCtx.createLinearGradient(0, hy, 0, skyH);
   vg.addColorStop(0, 'rgba(7,11,29,.08)'); vg.addColorStop(1, 'rgba(7,11,29,.28)');
   skyCtx.fillStyle = vg; skyCtx.fillRect(0, hy, skyW, skyH - hy);
-
-  // flat 3D compass — always faces the sun; flips after noon so letters stay readable
-  const afterNoon = sc.x < 0;
-  const compassY = hy + Math.min(56, skyH * 0.06);
-  skyCtx.save();
-  skyCtx.translate(cx, compassY);
-  skyCtx.scale(1, 0.28); // flatten
-  skyCtx.beginPath(); skyCtx.ellipse(0, 0, 78, 78, 0, 0, Math.PI * 2);
-  skyCtx.fillStyle = 'rgba(20,28,55,.55)'; skyCtx.fill();
-  skyCtx.strokeStyle = 'rgba(255,255,255,.25)'; skyCtx.lineWidth = 2; skyCtx.stroke();
-  // letters: for N hem facing sun → E left-of-view morning? Camera faces sun, so:
-  //   looking east at sunrise: S is to the right of view, N left, E forward (out toward viewer = bottom of ellipse)
-  // Mark: "At sunrise E points outward, lying flat toward the viewer"
-  const order = sc.southHem ? ['E', 'N', 'W'] : ['E', 'S', 'W']; // forward / right / back relative after rotation
-  // Rotate so "forward" (out toward viewer) is the direction of the sun (= facing).
-  // On the flat ellipse, bottom of screen = toward viewer = outward.
-  // Place E at outward at sunrise (facing≈90). Angle on dial: outward = +90° in our flattened circle before scale... 
-  skyCtx.scale(1, 1 / 0.28); // unflatten for text
-  skyCtx.font = '700 15px system-ui,sans-serif';
-  skyCtx.textAlign = 'center'; skyCtx.textBaseline = 'middle';
-  // Map: outward (toward viewer, +y) = sun direction. Left/right perpendicular.
-  // At sunrise facing E: E outward (bottom), S to the viewer's right, N left — but we show E,S,W arc.
-  const labs = sc.southHem ? [['E', 0], ['N', 1], ['W', 2]] : [['E', 0], ['S', 1], ['W', 2]];
-  // progress 0 at sunrise-ish (az 90), 0.5 at south (180), 1 at west (270)
-  for (const [lab, i] of labs) {
-    // position around the near semicircle from left → outward → right as morning→noon→afternoon
-    // i=0 E at outward when x=+1 (morning); as x goes +1→0→−1, E moves left then off
-    const t = (1 - sc.x) / 2; // morning 0 … noon 0.5 … afternoon 1
-    const ang = (i / 2 + t) * Math.PI; // sweep
-    // Actually simpler fixed relative to facing:
-    // outward = toward viewer = bottom = sun. Left = eastward side of view early.
-    const rel = { E: sc.southHem ? 180 : 90, S: 180, N: 0, W: 270 }[lab];
-    let da = T.mod(rel - sc.facing + 180, 360) - 180; // −180..180 relative to view
-    // screen: da=0 ahead (outward/bottom), da=+90 right, da=-90 left
-    if (Math.abs(da) > 110) continue; // behind the viewer — skip
-    const px = Math.sin(da * Math.PI / 180) * 70;
-    const py = Math.cos(da * Math.PI / 180) * 20; // foreshortened depth
-    skyCtx.save();
-    skyCtx.translate(px, py);
-    if (afterNoon) skyCtx.scale(-1, 1); // flip so letters stay readable from the "other side"
-    skyCtx.fillStyle = lab === 'E' || lab === 'W' ? '#ffb86b' : '#8fb8ff';
-    skyCtx.fillText(lab, 0, 0);
-    skyCtx.restore();
-  }
-  skyCtx.restore();
 
   // sync CSS vars softly for any leftover UI
   document.documentElement.style.setProperty('--bg1', cols[0]);

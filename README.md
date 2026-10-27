@@ -22,7 +22,7 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 | `app.js` | Builds the SVG dials and runs the `requestAnimationFrame` loop, location UI and sky gradient |
 | `time.js` | Pure ES module with all the math: Ten conversions, Ten date, LMST, GMST/LST, NOAA sun, equation of time |
 | `assets/sky/moon.png` | NASA public-domain moon texture (see `CREDITS.md`) |
-| `sw.js` | Optional, versioned offline cache (`ten-v18`). Bump it on changes |
+| `sw.js` | Optional, versioned offline cache (`ten-v19`). Bump it on changes |
 | `favicon.svg` | Icon (also used by the PWA manifest) |
 | `manifest.webmanifest` | Installable PWA manifest |
 | `_headers` | Cloudflare Pages security and cache headers (strict CSP, no third parties) |
@@ -45,7 +45,7 @@ There's no build step, no framework and no external requests.
 
 ## Animated sky
 
-The background sky draws the sun and moon on one inset semi-ellipse arch (rise→set simulation, morning-right). Moon phases use a NASA texture with a physical terminator (or your time-zone centre). The converter slider drives the **sky and its digital readout only** — the circular dials always show now. Tap **Now** to snap the sky back. Stars, a flat sun-facing compass, and decorative daytime clouds are drawn on a canvas (throttled to about 1 fps when idle; respects reduced motion).
+The background sky draws the sun and moon on one inset semi-ellipse arch (rise→set simulation, morning-right). Moon phases use a NASA texture with a physical terminator (or your time-zone centre). The converter slider drives the **sky and its digital readout only** — the circular dials always show now. Tap **Now** to snap the sky back. Stars and decorative daytime clouds are drawn on a canvas (throttled to about 1 fps when idle; respects reduced motion).
 
 ## Accuracy notes
 

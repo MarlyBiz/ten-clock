@@ -395,6 +395,6 @@ export function skyScene(date, latDeg, lonDeg) {
     su, mu,
     sunRise: st.sunrise, sunSet: st.sunset,
     moonRise: mt.rise, moonSet: mt.set,
-    facing: sun.az, southHem,
+    southHem,
   };
 }
