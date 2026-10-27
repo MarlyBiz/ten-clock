@@ -275,8 +275,15 @@ function sky(pos) {
 
 /* ---------- main loop ---------- */
 const last = {};
-const set = (id, text) => { if (last[id] !== text) { last[id] = text; $(id).textContent = text; } };
-const setHtml = (id, html) => { if (last[id] !== html) { last[id] = html; $(id).innerHTML = html; } };
+let timeEditId = null; // id of readout currently being typed into
+const set = (id, text) => {
+  if (timeEditId === id) return;
+  if (last[id] !== text) { last[id] = text; $(id).textContent = text; }
+};
+const setHtml = (id, html) => {
+  if (timeEditId === id) return; // don't clobber an in-progress edit
+  if (last[id] !== html) { last[id] = html; $(id).innerHTML = html; }
+};
 let lastLive = '', lastSecond = -1;
 
 function frame() {
@@ -763,6 +770,148 @@ addEventListener('orientationchange', () => {
 });
 // Do NOT listen to visualViewport resize/scroll — those fire on URL bar and scroll.
 
+
+
+/* ---------- Typed time entry (readouts → previewTs) ---------- */
+const TIME_EDIT_MAP = {
+  'c-shared': 'shared', 'c-exact': 'exact', 'c-regular': 'regular', 's-time': 'pick',
+};
+function prefillForEdit(kind, d) {
+  if (kind === 'shared') return T.formatTen(T.sharedTen(d));
+  if (kind === 'exact') return T.formatTen(T.exactTen(d, loc ? loc.lon : T.zoneCentreLongitude(d)));
+  // Standard: digits only; AM/PM via chip
+  if (hourFmt === '24') return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const { digits, ampm } = t12Parts(d, true);
+  return { digits, ampm };
+}
+function resolveEditKind(id) {
+  const k = TIME_EDIT_MAP[id];
+  return k === 'pick' ? pick : k;
+}
+function closeTimeEdit(restore) {
+  const wrap = document.querySelector('.time-edit-wrap');
+  if (!wrap) { timeEditId = null; return; }
+  const host = wrap.parentElement;
+  const id = timeEditId;
+  wrap.remove();
+  timeEditId = null;
+  if (restore && id) last[id] = null; // force refresh
+  lastSecond = -1;
+}
+function commitTimeEdit(id, input, chip) {
+  const kind = resolveEditKind(id);
+  const raw = input.value;
+  const lon = loc ? loc.lon : T.zoneCentreLongitude(masterClock());
+  const ref = masterClock();
+  let instant = null;
+  if (kind === 'shared' || kind === 'exact') {
+    const p = T.parseTenTime(raw);
+    if (!p.ok) { input.classList.add('invalid'); return false; }
+    input.classList.remove('invalid');
+    instant = T.typedTimeToInstant(kind, p.total, ref, lon);
+  } else {
+    let text = raw;
+    if (hourFmt === '12') {
+      const isAm = chip ? chip.dataset.period === 'am' : true;
+      text = `${raw} ${isAm ? 'am' : 'pm'}`;
+    }
+    const p = T.parseStandardTime(text, hourFmt);
+    if (!p.ok) { input.classList.add('invalid'); return false; }
+    input.classList.remove('invalid');
+    instant = T.typedTimeToInstant('regular', p.secOfDay, ref, lon);
+  }
+  if (!instant) { input.classList.add('invalid'); return false; }
+  closeTimeEdit(false);
+  masterEnterPreview(instant.getTime(), { drag: false, freeze: false });
+  return true;
+}
+function openTimeEdit(host) {
+  const id = host.id;
+  if (!TIME_EDIT_MAP[id]) return;
+  if (timeEditId === id) return;
+  closeTimeEdit(true);
+  const kind = resolveEditKind(id);
+  const d = masterClock();
+  const pre = prefillForEdit(kind, d);
+  const big = host.classList.contains('ten-big');
+  const wrap = document.createElement('span');
+  wrap.className = 'time-edit-wrap' + (big ? ' big' : ' tri');
+  const input = document.createElement('input');
+  input.className = 'time-edit-input';
+  input.type = 'text';
+  input.setAttribute('inputmode', 'numeric');
+  input.setAttribute('enterkeyhint', 'done');
+  input.setAttribute('autocomplete', 'off');
+  input.setAttribute('aria-label', 'Type a time');
+  let chip = null;
+  if (kind === 'regular' && hourFmt === '12') {
+    input.value = typeof pre === 'object' ? pre.digits : pre;
+    chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'ampm-chip';
+    const am = (typeof pre === 'object' ? pre.ampm : 'AM') === 'AM';
+    chip.dataset.period = am ? 'am' : 'pm';
+    chip.textContent = am ? 'AM' : 'PM';
+    chip.setAttribute('aria-pressed', 'true');
+    chip.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const next = chip.dataset.period === 'am' ? 'pm' : 'am';
+      chip.dataset.period = next;
+      chip.textContent = next.toUpperCase();
+      input.focus();
+    });
+  } else {
+    input.value = typeof pre === 'object' ? pre.digits : pre;
+  }
+  // Match host metrics so layout doesn't jump
+  const cs = getComputedStyle(host);
+  input.style.fontSize = cs.fontSize;
+  input.style.fontWeight = cs.fontWeight;
+  input.style.letterSpacing = cs.letterSpacing;
+  wrap.appendChild(input);
+  if (chip) wrap.appendChild(chip);
+  host.replaceChildren(wrap);
+  timeEditId = id;
+  last[id] = null;
+  const finish = (ok) => {
+    if (ok) commitTimeEdit(id, input, chip);
+    else { closeTimeEdit(true); }
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+    else input.classList.remove('invalid');
+  });
+  input.addEventListener('blur', () => {
+    // Defer so AM/PM chip click can run first
+    setTimeout(() => {
+      if (timeEditId !== id) return;
+      if (document.activeElement === chip) return;
+      finish(true);
+    }, 120);
+  });
+  input.focus();
+  input.select();
+}
+function bindTimeEdits() {
+  for (const id of Object.keys(TIME_EDIT_MAP)) {
+    const el = $(id);
+    if (!el || el.dataset.editBound) continue;
+    el.dataset.editBound = '1';
+    el.addEventListener('click', (e) => {
+      if (e.target.closest('.time-edit-wrap')) return;
+      openTimeEdit(el);
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        if (timeEditId === id) return;
+        e.preventDefault();
+        openTimeEdit(el);
+      }
+    });
+  }
+}
+bindTimeEdits();
 
 /* ---------- Install (PWA) ---------- */
 const installBtn = $('install-btn'), iosHint = $('ios-hint');

@@ -310,3 +310,47 @@ test('Preview seconds move with the scrub (back decreases, forward increases)', 
   assert.ok(T.localSecondsOfDay(back) < T.localSecondsOfDay(t0), 'local seconds-of-day decreases going back');
   assert.ok(T.sharedTen(back) < T.sharedTen(t0) || T.sharedTen(t0) - T.sharedTen(back) > 50000, 'sharedTen moves back with scrub');
 });
+
+
+test('Forgiving Ten / Standard time parse', () => {
+  assert.deepEqual(T.parseTenTime('5:00'), { ok: true, total: 50000 });
+  assert.deepEqual(T.parseTenTime('930'), { ok: true, total: 93000 });
+  assert.deepEqual(T.parseTenTime('7:5'), { ok: true, total: 70500 });
+  assert.deepEqual(T.parseTenTime('7:05:03'), { ok: true, total: 70503 });
+  assert.equal(T.parseTenTime('10:00').ok, false); // hour 10 invalid
+  assert.equal(T.parseTenTime('5:100').ok, false);
+  const am = T.parseStandardTime('9:00 AM', '12');
+  assert.equal(am.ok, true);
+  assert.equal(am.secOfDay, 9 * 3600);
+  const pm = T.parseStandardTime('9:00pm', '12');
+  assert.equal(pm.secOfDay, 21 * 3600);
+  assert.equal(T.parseStandardTime('930', '24').secOfDay, 9 * 3600 + 30 * 60);
+  assert.equal(T.parseStandardTime('7:5', '24').secOfDay, 7 * 3600 + 5 * 60);
+  assert.equal(T.parseStandardTime('21:00', '24').secOfDay, 21 * 3600);
+  assert.equal(T.parseStandardTime('9:00', '12').ok, false); // need a/p
+});
+
+test('Ten 5:00 types to Standard 6:00 AM; Standard 9:00 AM types to Ten ~5:62', () => {
+  process.env.TZ = 'America/Detroit';
+  const ref = new Date('2026-06-21T14:00:00Z'); // 10 AM EDT
+  const lon = -83.481;
+  // Ten 5:00:00 = 6:00 AM civil (shared)
+  const t5 = T.typedTimeToInstant('shared', 50000, ref, lon);
+  assert.ok(t5);
+  assert.equal(t5.getHours(), 6);
+  assert.equal(t5.getMinutes(), 0);
+  // Standard 9:00 AM
+  const s9 = T.typedTimeToInstant('regular', 9 * 3600, ref, lon);
+  assert.ok(s9);
+  assert.equal(s9.getHours(), 9);
+  assert.equal(s9.getMinutes(), 0);
+  const tenAt9 = T.formatTen(T.sharedTen(s9));
+  // 9 AM = 15h after 6 PM → Ten 15/2.4 = 6.25 → 6:25:00? 
+  // From 18:00 to 09:00 = 15 hours = 15/24 * 100000 = 62500 → 6:25:00
+  assert.equal(tenAt9, '6:25:00');
+  const mer = T.formatTen(T.exactTen(s9, lon));
+  // Meridian near Shared at this lon (offset ~1.5h in summer) — just assert it parses consistently
+  assert.match(mer, /^\d:\d{2}:\d{2}$/);
+  const back = T.typedTimeToInstant('exact', T.parseTenTime(mer).total, s9, lon);
+  assert.ok(Math.abs(back.getTime() - s9.getTime()) < 2000);
+});

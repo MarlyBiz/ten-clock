@@ -297,6 +297,93 @@ export function exactTenToInstant(base, tenTotal, lonDeg) {
   return new Date(startLmst - lonDeg * 240000 + Math.round(mod(tenTotal, 100000) * TEN_SECOND_S * 1000));
 }
 
+/* ---------- Typed time entry ---------- */
+
+/** Parse Ten / Meridian time: H:MM[:SS] with H 0–9, MM/SS 00–99. Forgiving ('930'→9:30, '7:5'→7:05). */
+export function parseTenTime(raw) {
+  const s = String(raw ?? '').trim().replace(/\s+/g, '');
+  if (!s) return { ok: false };
+  let h, m, sec = 0;
+  if (/^\d{1,6}$/.test(s)) {
+    // Compact: H, HMM, HMMSS, or HHMMSS with single-digit hour preferred
+    if (s.length <= 1) { h = +s; m = 0; }
+    else if (s.length === 2) { h = +s[0]; m = +s.slice(1); } // 30 → invalid hour later if used as 3:0 — treat as H+M: '30' → 3:0
+    else if (s.length === 3) { h = +s[0]; m = +s.slice(1); } // 930 → 9:30
+    else if (s.length === 4) { h = +s[0]; m = +s.slice(1, 3); sec = +s.slice(3); } // 9300 → 9:30:0
+    else if (s.length === 5) { h = +s[0]; m = +s.slice(1, 3); sec = +s.slice(3); } // 93000 → 9:30:00
+    else { h = +s[0]; m = +s.slice(1, 3); sec = +s.slice(3, 5); }
+  } else {
+    const parts = s.split(':');
+    if (parts.length < 2 || parts.length > 3) return { ok: false };
+    if (!parts.every((p) => /^\d{1,2}$/.test(p))) return { ok: false };
+    h = +parts[0]; m = +parts[1]; sec = parts[2] != null ? +parts[2] : 0;
+  }
+  if (!Number.isInteger(h) || h < 0 || h > 9) return { ok: false };
+  if (!Number.isInteger(m) || m < 0 || m > 99) return { ok: false };
+  if (!Number.isInteger(sec) || sec < 0 || sec > 99) return { ok: false };
+  return { ok: true, total: h * 10000 + m * 100 + sec };
+}
+
+/** Parse Standard civil time. hourFmt '12'|'24'. Forgiving; 12h accepts a/p/am/pm. */
+export function parseStandardTime(raw, hourFmt = '12') {
+  let s = String(raw ?? '').trim().replace(/\u00a0/g, ' ').replace(/\s+/g, ' ');
+  if (!s) return { ok: false };
+  let ampm = null;
+  const ap = s.match(/\s*([ap])\.?m?\.?\s*$/i);
+  if (ap) { ampm = ap[1].toLowerCase() === 'a' ? 'am' : 'pm'; s = s.slice(0, ap.index).trim(); }
+  s = s.replace(/\s+/g, '');
+  let h, m, sec = 0;
+  if (/^\d{1,6}$/.test(s)) {
+    if (s.length <= 2) { h = +s; m = 0; }
+    else if (s.length === 3) { h = +s[0]; m = +s.slice(1); }
+    else if (s.length === 4) { h = +s.slice(0, 2); m = +s.slice(2); }
+    else if (s.length === 5) { h = +s[0]; m = +s.slice(1, 3); sec = +s.slice(3); }
+    else { h = +s.slice(0, 2); m = +s.slice(2, 4); sec = +s.slice(4, 6); }
+  } else {
+    const parts = s.split(':');
+    if (parts.length < 2 || parts.length > 3) return { ok: false };
+    if (!parts.every((p) => /^\d{1,2}$/.test(p))) return { ok: false };
+    h = +parts[0]; m = +parts[1]; sec = parts[2] != null ? +parts[2] : 0;
+  }
+  if (!Number.isInteger(m) || m < 0 || m > 59) return { ok: false };
+  if (!Number.isInteger(sec) || sec < 0 || sec > 59) return { ok: false };
+  if (hourFmt === '24') {
+    if (!Number.isInteger(h) || h < 0 || h > 23) return { ok: false };
+  } else {
+    if (!Number.isInteger(h) || h < 1 || h > 12) return { ok: false };
+    if (!ampm) return { ok: false, needAmPm: true, h, m, sec };
+    if (h === 12) h = 0;
+    if (ampm === 'pm') h += 12;
+  }
+  return { ok: true, secOfDay: h * 3600 + m * 60 + sec, h, m, sec, ampm };
+}
+
+/**
+ * Resolve a typed reading to the Date in [localMidnight(ref), +48h) nearest to ref.
+ * kind: 'shared' | 'exact' | 'regular'.
+ */
+export function typedTimeToInstant(kind, value, ref, lonDeg = 0) {
+  const start = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate()).getTime();
+  const end = start + 48 * 3600 * 1000;
+  const cands = [];
+  const push = (d) => { if (d && Number.isFinite(d.getTime())) cands.push(d.getTime()); };
+  // Probe ref and ±1 / ±2 civil days so Ten days (start 18:00) are covered
+  for (const day of [-1, 0, 1, 2]) {
+    const base = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() + day);
+    if (kind === 'shared') push(sharedTenToInstant(base, value));
+    else if (kind === 'exact') push(exactTenToInstant(base, value, lonDeg));
+    else push(regularToInstant(base, value));
+  }
+  let best = null, bestDist = Infinity;
+  const refMs = ref.getTime();
+  for (const ms of cands) {
+    if (ms < start || ms >= end) continue;
+    const dist = Math.abs(ms - refMs);
+    if (dist < bestDist) { bestDist = dist; best = ms; }
+  }
+  return best == null ? null : new Date(best);
+}
+
 /** All three readings of one instant. */
 export function equivalents(date, lonDeg) {
   return {

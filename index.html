@@ -69,14 +69,14 @@
         <div class="hero-read">
           <!-- Combined: all three readouts -->
           <div class="tri one-only">
-            <div class="tri-row shared"><span class="tri-name"><i class="chip shared"></i>Ten</span><span class="tri-time" id="c-shared">—</span><span class="tri-date" id="c-shared-date">—</span></div>
-            <div class="tri-row exact"><span class="tri-name"><i class="chip exact"></i>Meridian</span><span class="tri-time" id="c-exact">—</span><span class="tri-date" id="c-exact-date">—</span></div>
-            <div class="tri-row regular"><span class="tri-name"><i class="chip regular"></i>Standard</span><span class="tri-time" id="c-regular">—</span><span class="tri-date" id="c-regular-date">—</span></div>
+            <div class="tri-row shared"><span class="tri-name"><i class="chip shared"></i>Ten</span><span class="tri-time time-edit" id="c-shared" role="button" tabindex="0" title="Tap to type a time" aria-label="Ten time, tap to edit">—</span><span class="tri-date" id="c-shared-date">—</span></div>
+            <div class="tri-row exact"><span class="tri-name"><i class="chip exact"></i>Meridian</span><span class="tri-time time-edit" id="c-exact" role="button" tabindex="0" title="Tap to type a time" aria-label="Meridian time, tap to edit">—</span><span class="tri-date" id="c-exact-date">—</span></div>
+            <div class="tri-row regular"><span class="tri-name"><i class="chip regular"></i>Standard</span><span class="tri-time time-edit" id="c-regular" role="button" tabindex="0" title="Tap to type a time" aria-label="Standard time, tap to edit">—</span><span class="tri-date" id="c-regular-date">—</span></div>
             <p class="note" id="c-note"></p>
           </div>
           <!-- Separate: the picked clock -->
           <div class="sep-only sep-read">
-            <p class="ten-big" id="s-time" aria-hidden="true">—</p>
+            <p class="ten-big time-edit" id="s-time" role="button" tabindex="0" title="Tap to type a time" aria-label="Time, tap to edit">—</p>
             <p class="ampm" id="s-sub"></p>
             <p class="ten-date" id="s-date">—</p>
             <p class="note" id="s-note"></p>
