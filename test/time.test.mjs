@@ -289,3 +289,24 @@ test('Sun times use the event date local DST offset (Detroit EDT vs EST)', () =>
   assert.ok(h(mar.sunrise) >= 6 && h(mar.sunrise) <= 8, `Mar rise hour ${h(mar.sunrise)}`);
   assert.ok(h(dec.sunrise) >= 7 && h(dec.sunrise) <= 9, `Dec rise hour ${h(dec.sunrise)}`);
 });
+
+
+test('Preview seconds move with the scrub (back decreases, forward increases)', () => {
+  // Single timestamp drives Standard SI seconds and Ten seconds (1 Ten-s = 0.864 SI s)
+  const t0 = new Date('2026-06-21T14:37:20.000Z');
+  const back = new Date(t0.getTime() - 30_000);
+  const fwd = new Date(t0.getTime() + 30_000);
+  const std = (d) => T.localSecondsOfDay(d) % 60;
+  const ten = (d) => T.sharedTen(d) % 100;
+  // Going back 30 SI seconds: Standard second hand moves ~30/60 of a turn backward
+  close(T.mod(std(t0) - std(back), 60), 30, 0.05, 'Standard seconds back 30s');
+  close(T.mod(std(fwd) - std(t0), 60), 30, 0.05, 'Standard seconds forward 30s');
+  // Ten seconds: 30 SI s ≈ 30/0.864 ≈ 34.722 Ten-seconds
+  const tenBack = T.mod(ten(t0) - ten(back), 100);
+  const tenFwd = T.mod(ten(fwd) - ten(t0), 100);
+  close(tenBack, 30 / T.TEN_SECOND_S, 0.05, `Ten seconds back (got ${tenBack})`);
+  close(tenFwd, 30 / T.TEN_SECOND_S, 0.05, `Ten seconds forward (got ${tenFwd})`);
+  // Absolute sharedTen / localSecondsOfDay also decrease when rewinding
+  assert.ok(T.localSecondsOfDay(back) < T.localSecondsOfDay(t0), 'local seconds-of-day decreases going back');
+  assert.ok(T.sharedTen(back) < T.sharedTen(t0) || T.sharedTen(t0) - T.sharedTen(back) > 50000, 'sharedTen moves back with scrub');
+});

@@ -248,10 +248,11 @@ function frame() {
   exactDial.setHands(smooth ? ex : Math.floor(ex));
   if (view === 'combined') comboHands({ shared: smooth ? sh : Math.floor(sh), regular: smooth ? ls : Math.floor(ls), exact: smooth ? ex : Math.floor(ex) });
 
-  // Refresh readouts every Ten-second when live; every SI second while previewing so Standard :SS moves
+  // Readouts: every Ten-second live; every SI second in preview (single previewTs drives both)
   const gate = MASTER.live ? Math.floor(sh) : (Math.floor(sh) * 100 + now.getSeconds());
   if (gate !== lastSecond) { lastSecond = gate; slowUpdate(now, sh); }
-  if (MASTER.live) masterTick(wall);
+  // Keep thumb + label in sync while live, or while preview is free-running
+  if (MASTER.live || (!MASTER.dragging && !MASTER.frozen)) masterTick(wall);
   requestAnimationFrame(frame);
 }
 
@@ -689,37 +690,48 @@ refreshInstall();
 
 
 /* ---------- Master time slider (scrubs dials + sky + converter together) ---------- */
-const MASTER = { live: true, hours: 48, instant: new Date(), tickSeconds: true }; // always 48h from local midnight
+/** Single preview timestamp (ms) is the source of truth while !live. */
+const MASTER = {
+  live: true,
+  hours: 48,
+  previewTs: Date.now(), // absolute ms
+  anchorWall: Date.now(), // wall ms when previewTs was stamped
+  dragging: false,        // finger on the slider
+  frozen: false,          // exact freeze (screenshots / __tenPreviewAt)
+};
+const MASTER_SPAN_S = MASTER.hours * 3600; // 172800 s over 48h
 const masterRange = $('master-range');
 const masterBar = $('master-bar');
 
 /** Local midnight (civil) for a Date. */
 const localMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
 /**
- * Master preview clock: live wall time, or scrubbed instant.
- * While scrubbing (tickSeconds), hour/minute stay on the slider but SI seconds
- * follow the wall clock so Standard + Ten second indicators keep moving.
- * Exact freezes (tests/screenshots) set tickSeconds=false.
+ * One preview clock for everything (hands, seconds tracks, readouts, sky).
+ * Live → wall. Dragging/frozen → exact previewTs. Held still → previewTs advances with real elapsed time.
  */
 const masterClock = (wall = new Date()) => {
   if (MASTER.live) return wall;
-  if (!MASTER.tickSeconds) return MASTER.instant;
-  const p = MASTER.instant;
-  return new Date(p.getFullYear(), p.getMonth(), p.getDate(),
-    p.getHours(), p.getMinutes(), wall.getSeconds(), wall.getMilliseconds());
+  if (MASTER.dragging || MASTER.frozen) return new Date(MASTER.previewTs);
+  return new Date(MASTER.previewTs + (wall.getTime() - MASTER.anchorWall));
 };
+
+function masterStamp(ts, wall = new Date()) {
+  MASTER.previewTs = ts;
+  MASTER.anchorWall = wall.getTime();
+}
 
 function masterStart(wall = new Date()) {
   return localMidnight(wall); // range starts at local midnight today
 }
 function masterSyncRange(wall = new Date()) {
   const start = masterStart(wall);
-  const max = MASTER.hours * 60; // 2880 minutes over 48h
-  masterRange.max = String(max - 1);
-  masterRange.step = '5';
-  const t = MASTER.live ? wall : MASTER.instant;
-  const mins = Math.min(max - 1, Math.max(0, Math.round((t.getTime() - start.getTime()) / 60000)));
-  masterRange.value = String(Math.round(mins / 5) * 5);
+  masterRange.min = '0';
+  masterRange.max = String(MASTER_SPAN_S - 1);
+  masterRange.step = '1';
+  const t = masterClock(wall);
+  const sec = Math.min(MASTER_SPAN_S - 1, Math.max(0, Math.round((t.getTime() - start.getTime()) / 1000)));
+  if (!MASTER.dragging) masterRange.value = String(sec);
   paintMasterBar(wall);
 }
 function paintMasterBar(wall = new Date()) {
@@ -744,12 +756,21 @@ function paintMasterBar(wall = new Date()) {
     mark('sun set m-set', b, st.sunset);
   }
 }
-function masterJump(date) {
-  MASTER.live = false; MASTER.tickSeconds = true; MASTER.instant = new Date(date.getTime());
-  SL.live = false; SL.instant = new Date(date.getTime()); skySliding = true;
-  masterSyncRange(); masterRender(); syncRange(); sliderRender(); paintSky(MASTER.instant, true);
+function masterEnterPreview(ts, { drag = false, freeze = false } = {}) {
+  const wall = new Date();
+  MASTER.live = false;
+  MASTER.dragging = drag;
+  MASTER.frozen = freeze;
+  masterStamp(ts, wall);
+  SL.live = false; SL.instant = new Date(ts); skySliding = true;
+  masterSyncRange(wall); masterRender(); syncRange(); sliderRender();
+  paintSky(new Date(ts), true);
   lastSecond = -1;
-  slowUpdate(MASTER.instant, T.sharedTen(MASTER.instant));
+  const d = new Date(ts);
+  slowUpdate(d, T.sharedTen(d));
+}
+function masterJump(date) {
+  masterEnterPreview(date.getTime(), { drag: false, freeze: false });
 }
 function masterRender() {
   const d = masterClock();
@@ -766,22 +787,40 @@ function masterTick(wall) {
   masterSyncRange(wall);
   masterRender();
 }
-masterRange.addEventListener('pointerdown', () => { skySliding = true; });
+function masterEndDrag() {
+  if (!MASTER.dragging) return;
+  // Lock current preview time, then let it run forward with wall clock
+  const wall = new Date();
+  const now = masterClock(wall);
+  MASTER.dragging = false;
+  MASTER.frozen = false;
+  masterStamp(now.getTime(), wall);
+  SL.instant = now;
+  skySliding = false;
+}
+masterRange.addEventListener('pointerdown', () => { skySliding = true; MASTER.dragging = true; MASTER.frozen = false; });
+masterRange.addEventListener('pointerup', masterEndDrag);
+masterRange.addEventListener('pointercancel', masterEndDrag);
+masterRange.addEventListener('change', masterEndDrag); // keyboard / mouse release
 masterRange.addEventListener('input', () => {
   const start = masterStart();
-  const mins = +masterRange.value;
-  MASTER.live = false; MASTER.tickSeconds = true;
-  MASTER.instant = new Date(start.getTime() + mins * 60000);
-  SL.live = false; SL.instant = new Date(MASTER.instant.getTime()); skySliding = true;
-  masterRender(); syncRange(); sliderRender(); paintSky(MASTER.instant, true);
+  const sec = +masterRange.value;
+  MASTER.live = false;
+  MASTER.dragging = true;
+  MASTER.frozen = false;
+  masterStamp(start.getTime() + sec * 1000);
+  SL.live = false; SL.instant = new Date(MASTER.previewTs); skySliding = true;
+  masterRender(); syncRange(); sliderRender(); paintSky(new Date(MASTER.previewTs), true);
   lastSecond = -1;
-  const sh = T.sharedTen(MASTER.instant);
-  slowUpdate(MASTER.instant, sh); // dials + Combined/Separate readouts follow immediately
+  const d = new Date(MASTER.previewTs);
+  slowUpdate(d, T.sharedTen(d));
 });
 $('master-now').addEventListener('click', () => {
-  MASTER.live = true; MASTER.tickSeconds = true; SL.live = true; skySliding = false;
+  MASTER.live = true; MASTER.dragging = false; MASTER.frozen = false;
+  SL.live = true; skySliding = false;
   const wall = new Date();
-  SL.instant = wall; MASTER.instant = wall;
+  masterStamp(wall.getTime(), wall);
+  SL.instant = wall;
   masterSyncRange(wall); masterRender(); syncRange(); sliderRender(); paintSky(wall, true);
   lastSecond = -1;
 });
@@ -1092,11 +1131,7 @@ requestAnimationFrame(frame);
 
 // Test/screenshot hook: preview dials+sky at an arbitrary instant (ISO string)
 window.__tenPreviewAt = (iso) => {
-  const d = new Date(iso);
-  MASTER.live = false; MASTER.tickSeconds = false; MASTER.instant = d; // freeze exact seconds
-  SL.live = false; SL.instant = d; skySliding = true;
-  masterSyncRange(d); masterRender(); syncRange(); sliderRender();
-  paintSky(d, true); lastSecond = -1; slowUpdate(d, T.sharedTen(d));
+  masterEnterPreview(new Date(iso).getTime(), { drag: false, freeze: true });
 };
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
