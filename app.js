@@ -788,15 +788,14 @@ function resolveEditKind(id) {
   const k = TIME_EDIT_MAP[id];
   return k === 'pick' ? pick : k;
 }
-function closeTimeEdit(restore) {
+function closeTimeEdit() {
   const wrap = document.querySelector('.time-edit-wrap');
-  if (!wrap) { timeEditId = null; return; }
-  const host = wrap.parentElement;
   const id = timeEditId;
-  wrap.remove();
-  timeEditId = null;
-  if (restore && id) last[id] = null; // force refresh
+  timeEditId = null; // clear first so blur handlers no-op
+  if (wrap) wrap.remove();
+  for (const k of Object.keys(TIME_EDIT_MAP)) last[k] = null;
   lastSecond = -1;
+  return id;
 }
 function commitTimeEdit(id, input, chip) {
   const kind = resolveEditKind(id);
@@ -821,7 +820,7 @@ function commitTimeEdit(id, input, chip) {
     instant = T.typedTimeToInstant('regular', p.secOfDay, ref, lon);
   }
   if (!instant) { input.classList.add('invalid'); return false; }
-  closeTimeEdit(false);
+  closeTimeEdit();
   masterEnterPreview(instant.getTime(), { drag: false, freeze: false });
   return true;
 }
@@ -829,7 +828,7 @@ function openTimeEdit(host) {
   const id = host.id;
   if (!TIME_EDIT_MAP[id]) return;
   if (timeEditId === id) return;
-  closeTimeEdit(true);
+  closeTimeEdit();
   const kind = resolveEditKind(id);
   const d = masterClock();
   const pre = prefillForEdit(kind, d);
@@ -852,7 +851,7 @@ function openTimeEdit(host) {
     const am = (typeof pre === 'object' ? pre.ampm : 'AM') === 'AM';
     chip.dataset.period = am ? 'am' : 'pm';
     chip.textContent = am ? 'AM' : 'PM';
-    chip.setAttribute('aria-pressed', 'true');
+    chip.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus on input
     chip.addEventListener('click', (e) => {
       e.preventDefault(); e.stopPropagation();
       const next = chip.dataset.period === 'am' ? 'pm' : 'am';
@@ -863,7 +862,6 @@ function openTimeEdit(host) {
   } else {
     input.value = typeof pre === 'object' ? pre.digits : pre;
   }
-  // Match host metrics so layout doesn't jump
   const cs = getComputedStyle(host);
   input.style.fontSize = cs.fontSize;
   input.style.fontWeight = cs.fontWeight;
@@ -873,9 +871,16 @@ function openTimeEdit(host) {
   host.replaceChildren(wrap);
   timeEditId = id;
   last[id] = null;
+  let settled = false;
   const finish = (ok) => {
-    if (ok) commitTimeEdit(id, input, chip);
-    else { closeTimeEdit(true); }
+    if (settled || timeEditId !== id) return;
+    settled = true;
+    if (ok) {
+      if (!commitTimeEdit(id, input, chip)) settled = false; // allow retry on invalid
+    } else {
+      closeTimeEdit();
+      lastSecond = -1;
+    }
   };
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
@@ -883,10 +888,9 @@ function openTimeEdit(host) {
     else input.classList.remove('invalid');
   });
   input.addEventListener('blur', () => {
-    // Defer so AM/PM chip click can run first
     setTimeout(() => {
-      if (timeEditId !== id) return;
-      if (document.activeElement === chip) return;
+      if (settled || timeEditId !== id) return;
+      if (chip && document.activeElement === chip) return;
       finish(true);
     }, 120);
   });
