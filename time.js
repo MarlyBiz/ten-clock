@@ -219,3 +219,75 @@ export function ringHand(band, innermost) {
 
 /** Labels around a Regular dial for the shared 12h/24h setting. Index = hour-of-day (0..23). */
 export const regularDialLabels = (fmt) => Array.from({ length: 24 }, (_, h) => (fmt === '12' ? (h % 12 || 12) : h));
+
+/* ---------- Sky: sun, moon (NOAA / Meeus, on-device; DEG = deg→rad) ---------- */
+const TO_DEG = 180 / Math.PI;
+
+/** Sun altitude (deg) and azimuth (deg from N, clockwise) at date/lat/lon. */
+export function sunPosition(date, latDeg, lonDeg) {
+  const jd = julianDate(date), jc = (jd - 2451545) / 36525;
+  const L = mod(280.46646 + jc * (36000.76983 + jc * 0.0003032), 360);
+  const M = 357.52911 + jc * (35999.05029 - 0.0001537 * jc);
+  const C = Math.sin(M * DEG) * (1.914602 - jc * (0.004817 + 0.000014 * jc))
+          + Math.sin(2 * M * DEG) * (0.019993 - 0.000101 * jc) + Math.sin(3 * M * DEG) * 0.000289;
+  const omega = 125.04 - 1934.136 * jc;
+  const appLong = L + C - 0.00569 - 0.00478 * Math.sin(omega * DEG);
+  const obliq0 = 23 + (26 + (21.448 - jc * (46.815 + jc * (0.00059 - jc * 0.001813))) / 60) / 60;
+  const obliq = (obliq0 + 0.00256 * Math.cos(omega * DEG)) * DEG;
+  const ra = Math.atan2(Math.cos(obliq) * Math.sin(appLong * DEG), Math.cos(appLong * DEG));
+  const dec = Math.asin(Math.sin(obliq) * Math.sin(appLong * DEG));
+  const gmst = (280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * jc * jc) * DEG;
+  const ha = gmst + lonDeg * DEG - ra, lat = latDeg * DEG;
+  const alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha)) * TO_DEG;
+  const az = mod(Math.atan2(Math.sin(ha), Math.cos(ha) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat)) * TO_DEG + 180, 360);
+  return { alt, az };
+}
+
+/** Moon altitude/azimuth, illuminated fraction 0..1, and waxing flag. */
+export function moonPosition(date, latDeg, lonDeg) {
+  const jd = julianDate(date), T = (jd - 2451545) / 36525;
+  const Lp = mod(218.3164477 + 481267.88123421 * T, 360);
+  const D = mod(297.8501921 + 445267.1114034 * T, 360) * DEG;
+  const M = mod(357.5291092 + 35999.0502909 * T, 360) * DEG;
+  const Mp = mod(134.9633964 + 477198.8675055 * T, 360) * DEG;
+  const F = mod(93.2720950 + 483202.0175233 * T, 360) * DEG;
+  const lon = (Lp + 6.289 * Math.sin(Mp) + 1.274 * Math.sin(2 * D - Mp) + 0.658 * Math.sin(2 * D)
+    + 0.214 * Math.sin(2 * Mp) - 0.186 * Math.sin(M) - 0.114 * Math.sin(2 * F)) * DEG;
+  const latM = (5.128 * Math.sin(F) + 0.281 * Math.sin(Mp + F) + 0.278 * Math.sin(Mp - F)) * DEG;
+  const ob = (23.439291 - 0.0130042 * T) * DEG;
+  const x = Math.cos(latM) * Math.cos(lon);
+  const y = Math.cos(ob) * Math.cos(latM) * Math.sin(lon) - Math.sin(ob) * Math.sin(latM);
+  const z = Math.sin(ob) * Math.cos(latM) * Math.sin(lon) + Math.cos(ob) * Math.sin(latM);
+  const ra = Math.atan2(y, x), dec = Math.atan2(z, Math.hypot(x, y));
+  const gmst = (280.46061837 + 360.98564736629 * (jd - 2451545)) * DEG;
+  const ha = gmst + lonDeg * DEG - ra, lat = latDeg * DEG;
+  const alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha)) * TO_DEG;
+  const az = mod(Math.atan2(Math.sin(ha), Math.cos(ha) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat)) * TO_DEG + 180, 360);
+  const synodic = 29.530588853, age = mod(jd - 2451550.1, synodic);
+  const frac = (1 - Math.cos((age / synodic) * 2 * Math.PI)) / 2;
+  return { alt, az, frac, waxing: age < synodic / 2, age };
+}
+
+/**
+ * Sky scene for the animated background. Camera faces the sun.
+ * x/y: sun on screen (−1 left … +1 right; y 0 = horizon mid-dial, 1 = top).
+ * Morning sun is to the right of center; after noon it flips to the left (viewer turned).
+ * Southern hemisphere is mirrored so the same cinematic rule holds.
+ */
+export function skyScene(date, latDeg, lonDeg) {
+  const sun = sunPosition(date, latDeg, lonDeg);
+  const moon = moonPosition(date, latDeg, lonDeg);
+  const southHem = latDeg < 0;
+  const maxAlt = Math.max(8, 90 - Math.abs(latDeg - 23.44 * Math.sin(2 * Math.PI * (julianDate(date) - 2451545) / 365.25)));
+  const meridianAz = southHem ? 0 : 180;
+  const dAz = mod(sun.az - meridianAz + 180, 360) - 180;
+  // N hem: east of south → negative dAz → morning should be RIGHT → use −dAz
+  const morningRight = southHem ? dAz : -dAz;
+  const x = Math.max(-1, Math.min(1, morningRight / 90));
+  const y = sun.alt <= 0 ? Math.max(-0.6, sun.alt / 18) : Math.min(1, sun.alt / maxAlt);
+  let mdAz = mod(moon.az - sun.az + 180, 360) - 180;
+  if (!southHem) mdAz = -mdAz;
+  const mx = Math.max(-1.35, Math.min(1.35, mdAz / 90));
+  const my = moon.alt <= 0 ? Math.max(-0.6, moon.alt / 18) : Math.min(1, moon.alt / maxAlt);
+  return { sun, moon, x, y, mx, my, facing: sun.az, southHem, maxAlt };
+}

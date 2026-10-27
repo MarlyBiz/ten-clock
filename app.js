@@ -258,7 +258,7 @@ function slowUpdate(now, sh) {
   const td = T.sharedTenDate(now);
   updateSun(now, td);
   sliderTick(now);
-  sky(T.tenHourPosition(sh));
+  // sky canvas follows SL.instant via sliderTick, not the dials
 
   // the three readings
   const exLon = loc ? loc.lon : T.zoneCentreLongitude(now), approx = !loc;
@@ -428,6 +428,182 @@ document.querySelectorAll('.ring-sw').forEach((b) => b.addEventListener('click',
 }));
 applyView();
 
+
+/* ---------- Animated sky (sun/moon/compass/stars/clouds); follows slider instant ---------- */
+const skyCv = $('sky'), skyCtx = skyCv.getContext('2d', { alpha: false });
+const reduceSky = matchMedia('(prefers-reduced-motion: reduce)');
+const stars = Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.55, r: Math.random() * 1.2 + 0.3, p: Math.random() * Math.PI * 2 }));
+const clouds = Array.from({ length: 5 }, (_, i) => ({ x: Math.random(), y: 0.12 + i * 0.06, s: 0.35 + Math.random() * 0.4, v: 0.003 + Math.random() * 0.004 }));
+let skyW = 0, skyH = 0, lastSky = 0, skySliding = false;
+const skyPlace = (d) => {
+  const p = sunPlace(d);
+  return T.skyScene(d, p.lat, p.lon);
+};
+function resizeSky() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  skyW = innerWidth; skyH = innerHeight;
+  skyCv.width = Math.round(skyW * dpr); skyCv.height = Math.round(skyH * dpr);
+  skyCv.style.width = skyW + 'px'; skyCv.style.height = skyH + 'px';
+  skyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+function horizonY() {
+  const el = document.querySelector('.dial-wrap .dial:not([style*="display: none"])') || $('combo') || document.querySelector('.dial');
+  if (!el) return skyH * 0.42;
+  const r = el.getBoundingClientRect();
+  return r.top + r.height / 2;
+}
+function skyColors(alt) {
+  // alt in degrees; blend dawn/day/sunset/night
+  if (alt > 15) return ['#4aa3ff', '#87c5ff', '#cfe9ff'];
+  if (alt > 0) { const t = alt / 15; return mix3(['#ff7a4a', '#ffb06b', '#6a4a8a'], ['#4aa3ff', '#87c5ff', '#cfe9ff'], t); }
+  if (alt > -6) { const t = (alt + 6) / 6; return mix3(['#0b1230', '#1a1040', '#2a1848'], ['#ff7a4a', '#ffb06b', '#6a4a8a'], t); }
+  return ['#050814', '#0b1230', '#15204a'];
+}
+const mix3 = (a, b, t) => a.map((c, i) => {
+  const parse = (h) => [1, 3, 5].map((j) => parseInt(h.slice(j, j + 2), 16));
+  const A = parse(c), B = parse(b[i]);
+  return '#' + A.map((v, k) => Math.round(v + (B[k] - v) * t).toString(16).padStart(2, '0')).join('');
+});
+function drawMoon(ctx, x, y, r, frac, waxing) {
+  if (frac < 0.04) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(220,230,255,.28)'; ctx.lineWidth = 1.4; ctx.stroke(); return;
+  }
+  ctx.save();
+  // lit disk
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8eeff'; ctx.fill();
+  // shadow disk offset (waxing = lit on the right)
+  if (frac < 0.995) {
+    const phase = (waxing ? 1 : -1) * (1 - 2 * frac); // −1..1
+    ctx.beginPath(); ctx.arc(x + phase * r, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(8,12,32,.92)'; ctx.fill();
+  }
+  ctx.restore();
+}
+function paintSky(date, force = false) {
+  const now = performance.now();
+  if (!force && !skySliding && now - lastSky < 1000) return;
+  lastSky = now;
+  if (!skyW) resizeSky();
+  const sc = skyPlace(date);
+  const hy = horizonY(), cx = skyW / 2;
+  const cols = skyColors(sc.sun.alt);
+  const g = skyCtx.createLinearGradient(0, 0, 0, skyH);
+  g.addColorStop(0, cols[0]); g.addColorStop(Math.max(0.15, Math.min(0.7, hy / skyH)), cols[1]); g.addColorStop(1, cols[2]);
+  skyCtx.fillStyle = g; skyCtx.fillRect(0, 0, skyW, skyH);
+
+  // stars (night / twilight)
+  const night = Math.max(0, Math.min(1, (-sc.sun.alt) / 12));
+  if (night > 0.05) {
+    for (const s of stars) {
+      const tw = reduceSky.matches ? 1 : 0.55 + 0.45 * Math.sin(now / 700 + s.p);
+      skyCtx.beginPath(); skyCtx.arc(s.x * skyW, s.y * hy, s.r, 0, Math.PI * 2);
+      skyCtx.fillStyle = `rgba(255,255,255,${(0.35 + 0.5 * tw) * night})`; skyCtx.fill();
+    }
+  }
+
+  // decorative daytime clouds
+  if (sc.sun.alt > -2 && !reduceSky.matches) {
+    skyCtx.fillStyle = 'rgba(255,255,255,.12)';
+    for (const c of clouds) {
+      const cx0 = ((c.x + (now / 60000) * c.v) % 1.4) * skyW - skyW * 0.2;
+      const cy0 = c.y * hy;
+      for (let k = 0; k < 3; k++) {
+        skyCtx.beginPath();
+        skyCtx.ellipse(cx0 + k * 28 * c.s, cy0 + (k % 2) * 6, 40 * c.s, 14 * c.s, 0, 0, Math.PI * 2);
+        skyCtx.fill();
+      }
+    }
+  } else if (sc.sun.alt > -2) {
+    skyCtx.fillStyle = 'rgba(255,255,255,.1)';
+    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.2, hy * 0.25, 50, 16, 0, 0, Math.PI * 2); skyCtx.fill();
+    skyCtx.beginPath(); skyCtx.ellipse(skyW * 0.7, hy * 0.18, 60, 18, 0, 0, Math.PI * 2); skyCtx.fill();
+  }
+
+  // map scene x/y → pixels (horizon = dial mid)
+  const spanX = Math.min(skyW * 0.42, 220);
+  const spanY = Math.min(hy * 0.85, 260);
+  const sx = cx + sc.x * spanX, sy = hy - sc.y * spanY;
+  const mx = cx + sc.mx * spanX, my = hy - sc.my * spanY;
+
+  // moon (behind sun if both up; dominant at night)
+  if (sc.moon.alt > -8) {
+    const mr = sc.sun.alt < 0 ? 18 : 11;
+    const a = sc.sun.alt < 0 ? 1 : 0.55;
+    skyCtx.globalAlpha = a;
+    drawMoon(skyCtx, mx, my, mr, sc.moon.frac, sc.moon.waxing);
+    skyCtx.globalAlpha = 1;
+  }
+
+  // sun always drawn (even "gloomy")
+  if (sc.sun.alt > -12) {
+    const R = 22;
+    const glow = skyCtx.createRadialGradient(sx, sy, 2, sx, sy, R * 3);
+    glow.addColorStop(0, 'rgba(255,240,180,.95)');
+    glow.addColorStop(0.35, 'rgba(255,180,80,.45)');
+    glow.addColorStop(1, 'rgba(255,140,40,0)');
+    skyCtx.fillStyle = glow; skyCtx.beginPath(); skyCtx.arc(sx, sy, R * 3, 0, Math.PI * 2); skyCtx.fill();
+    skyCtx.fillStyle = '#fff6c8'; skyCtx.beginPath(); skyCtx.arc(sx, sy, R, 0, Math.PI * 2); skyCtx.fill();
+  }
+
+  // ground veil below horizon (keeps dial readable, hides sun/moon below)
+  const vg = skyCtx.createLinearGradient(0, hy, 0, skyH);
+  vg.addColorStop(0, 'rgba(7,11,29,.15)'); vg.addColorStop(0.35, 'rgba(7,11,29,.72)'); vg.addColorStop(1, 'rgba(7,11,29,.92)');
+  skyCtx.fillStyle = vg; skyCtx.fillRect(0, hy, skyW, skyH - hy);
+
+  // flat 3D compass — always faces the sun; flips after noon so letters stay readable
+  const afterNoon = sc.x < 0;
+  const compassY = hy + Math.min(56, skyH * 0.06);
+  skyCtx.save();
+  skyCtx.translate(cx, compassY);
+  skyCtx.scale(1, 0.28); // flatten
+  skyCtx.beginPath(); skyCtx.ellipse(0, 0, 78, 78, 0, 0, Math.PI * 2);
+  skyCtx.fillStyle = 'rgba(20,28,55,.55)'; skyCtx.fill();
+  skyCtx.strokeStyle = 'rgba(255,255,255,.25)'; skyCtx.lineWidth = 2; skyCtx.stroke();
+  // letters: for N hem facing sun → E left-of-view morning? Camera faces sun, so:
+  //   looking east at sunrise: S is to the right of view, N left, E forward (out toward viewer = bottom of ellipse)
+  // Mark: "At sunrise E points outward, lying flat toward the viewer"
+  const order = sc.southHem ? ['E', 'N', 'W'] : ['E', 'S', 'W']; // forward / right / back relative after rotation
+  // Rotate so "forward" (out toward viewer) is the direction of the sun (= facing).
+  // On the flat ellipse, bottom of screen = toward viewer = outward.
+  // Place E at outward at sunrise (facing≈90). Angle on dial: outward = +90° in our flattened circle before scale... 
+  skyCtx.scale(1, 1 / 0.28); // unflatten for text
+  skyCtx.font = '700 15px system-ui,sans-serif';
+  skyCtx.textAlign = 'center'; skyCtx.textBaseline = 'middle';
+  // Map: outward (toward viewer, +y) = sun direction. Left/right perpendicular.
+  // At sunrise facing E: E outward (bottom), S to the viewer's right, N left — but we show E,S,W arc.
+  const labs = sc.southHem ? [['E', 0], ['N', 1], ['W', 2]] : [['E', 0], ['S', 1], ['W', 2]];
+  // progress 0 at sunrise-ish (az 90), 0.5 at south (180), 1 at west (270)
+  for (const [lab, i] of labs) {
+    // position around the near semicircle from left → outward → right as morning→noon→afternoon
+    // i=0 E at outward when x=+1 (morning); as x goes +1→0→−1, E moves left then off
+    const t = (1 - sc.x) / 2; // morning 0 … noon 0.5 … afternoon 1
+    const ang = (i / 2 + t) * Math.PI; // sweep
+    // Actually simpler fixed relative to facing:
+    // outward = toward viewer = bottom = sun. Left = eastward side of view early.
+    const rel = { E: sc.southHem ? 180 : 90, S: 180, N: 0, W: 270 }[lab];
+    let da = T.mod(rel - sc.facing + 180, 360) - 180; // −180..180 relative to view
+    // screen: da=0 ahead (outward/bottom), da=+90 right, da=-90 left
+    if (Math.abs(da) > 110) continue; // behind the viewer — skip
+    const px = Math.sin(da * Math.PI / 180) * 70;
+    const py = Math.cos(da * Math.PI / 180) * 20; // foreshortened depth
+    skyCtx.save();
+    skyCtx.translate(px, py);
+    if (afterNoon) skyCtx.scale(-1, 1); // flip so letters stay readable from the "other side"
+    skyCtx.fillStyle = lab === 'E' || lab === 'W' ? '#ffb86b' : '#8fb8ff';
+    skyCtx.fillText(lab, 0, 0);
+    skyCtx.restore();
+  }
+  skyCtx.restore();
+
+  // sync CSS vars softly for any leftover UI
+  document.documentElement.style.setProperty('--bg1', cols[0]);
+  document.documentElement.style.setProperty('--bg2', cols[2]);
+}
+addEventListener('resize', () => { resizeSky(); lastSky = 0; paintSky((typeof SL !== 'undefined' && SL.instant) || new Date(), true); });
+
+
 /* ---------- Install (PWA) ---------- */
 const installBtn = $('install-btn'), iosHint = $('ios-hint');
 const standaloneMQ = matchMedia('(display-mode: standalone)');
@@ -549,19 +725,23 @@ function sliderRender() {
 }
 
 function sliderTick(now) {
-  if (!SL.live) { sliderRender(); return; }
+  if (!SL.live) { sliderRender(); paintSky(SL.instant); return; }
   SL.instant = now;
   syncRange();
   sliderRender();
+  paintSky(SL.instant);
 }
 
+range.addEventListener('pointerdown', () => { skySliding = true; });
+addEventListener('pointerup', () => { skySliding = false; });
 range.addEventListener('input', () => {
   const v = +range.value, base = SL.instant;
-  SL.live = false;
+  SL.live = false; skySliding = true;
   SL.instant = SL.drive === 'regular' ? T.regularToInstant(base, v * 60)
     : SL.drive === 'shared' ? T.sharedTenToInstant(base, v * 100)
     : T.exactTenToInstant(base, v * 100, slLon());
   sliderRender();
+  paintSky(SL.instant, true);
 });
 document.querySelectorAll('[data-drive]').forEach((b) => b.addEventListener('click', () => {
   SL.drive = b.dataset.drive;
@@ -624,6 +804,7 @@ applyFmt();
 
 buildCombo();
 renderLocUI();
+resizeSky(); paintSky(new Date(), true);
 requestAnimationFrame(frame);
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

@@ -18,6 +18,7 @@
   <script type="module" src="app.js"></script>
 </head>
 <body>
+  <canvas id="sky" aria-hidden="true"></canvas>
   <a class="skip" href="#explain">Skip to how it works</a>
   <header class="top">
     <h1 class="brand"><span class="brand-mark" aria-hidden="true">10</span> Ten</h1>
@@ -105,7 +106,7 @@
         <div class="bar-row" data-scale="regular"><span class="bar-name">Regular</span><div class="bar" id="bar-regular"></div></div>
         <input type="range" id="sl-range" class="sl-range" min="0" max="999" step="1" value="0" aria-label="Slide Ten time">
       </div>
-      <p class="note">Drag the slider or use the arrow keys. The other two bars follow to the same moment. Tap Now to go back to live time.</p>
+      <p class="note">Drag to move the sky and the digital times below — the dials keep showing now. The other two bars follow. Tap Now to snap the sky back.</p>
     </section>
 
     <!-- Location (for Meridian and real sunrise/sunset) -->

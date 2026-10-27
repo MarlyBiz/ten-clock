@@ -167,3 +167,30 @@ test('One dial geometry: 24h ring orientation and ring bands', () => {
   assert.equal(T.regularDialLabels('24')[18], 18);
   assert.equal(T.regularDialTurns(18 * 3600), 0.25); // 18:00 at right
 });
+
+test('Sky: sun altitude and moon phase sanity', () => {
+  // Walled Lake solar noon ~17:36 UTC on 2026-06-21 → sun high in south
+  const noon = new Date('2026-06-21T17:36:00Z');
+  const s = T.sunPosition(noon, 42.538, -83.481);
+  assert.ok(s.alt > 60 && s.alt < 75, `June noon alt ${s.alt}`);
+  assert.ok(s.az > 150 && s.az < 210, `June noon az ${s.az}`);
+  // Midnight → sun below horizon
+  const mid = T.sunPosition(new Date('2026-06-21T05:00:00Z'), 42.538, -83.481);
+  assert.ok(mid.alt < -10, `night alt ${mid.alt}`);
+  // Scene: morning sun to the right of center (positive x), afternoon to the left
+  const morn = T.skyScene(new Date('2026-06-21T14:00:00Z'), 42.538, -83.481); // 10 AM EDT
+  const aft = T.skyScene(new Date('2026-06-21T21:00:00Z'), 42.538, -83.481); // 5 PM EDT
+  assert.ok(morn.x > 0.1, `morning x ${morn.x}`);
+  assert.ok(aft.x < -0.1, `afternoon x ${aft.x}`);
+  assert.ok(morn.y > 0.2 && morn.sun.alt > 0, 'morning sun above horizon');
+  // Sydney winter noon (sun in north) still maps morning to +x
+  const syd = T.skyScene(new Date('2026-06-21T02:00:00Z'), -33.87, 151.21);
+  assert.equal(syd.southHem, true);
+  // Full moon ≈ age 14–15 → frac near 1; new moon age ~0 → frac near 0
+  const full = T.moonPosition(new Date(2451550.1 * 86400000 - 2440587.5 * 86400000 + 14.77 * 86400000), 0, 0);
+  // Use a known-ish date: 2026-01-03 was a full moon (approx)
+  const fm = T.moonPosition(new Date('2026-01-03T12:00:00Z'), 0, 0);
+  const nm = T.moonPosition(new Date('2026-01-18T12:00:00Z'), 0, 0); // new ~ Jan 18 2026
+  assert.ok(fm.frac > 0.85, `full frac ${fm.frac}`);
+  assert.ok(nm.frac < 0.15, `new frac ${nm.frac}`);
+});

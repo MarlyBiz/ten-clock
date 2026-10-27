@@ -21,7 +21,7 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 | `styles.css` | Night-sky theme, responsive from 360px up |
 | `app.js` | Builds the SVG dials and runs the `requestAnimationFrame` loop, location UI and sky gradient |
 | `time.js` | Pure ES module with all the math: Ten conversions, Ten date, LMST, GMST/LST, NOAA sun, equation of time |
-| `sw.js` | Optional, versioned offline cache (`ten-v11`). Bump it on changes |
+| `sw.js` | Optional, versioned offline cache (`ten-v12`). Bump it on changes |
 | `favicon.svg` | Icon (also used by the PWA manifest) |
 | `manifest.webmanifest` | Installable PWA manifest |
 | `_headers` | Cloudflare Pages security and cache headers (strict CSP, no third parties) |
@@ -41,6 +41,10 @@ There's no build step, no framework and no external requests.
 - Dashboard: **Workers & Pages → Create → Pages → Connect to Git**. Pick the repo, set **no build command**, and set the output directory to `/`.
 - Or from the CLI (Worker with static assets, see `wrangler.jsonc`): `sh scripts/build.sh && npx wrangler deploy` (custom domain `ten.marlylabs.app`).
 - Optional custom domain: open the Pages project → Custom domains → `ten.marlylabs.app`.
+
+## Animated sky
+
+The background sky follows the real sun and moon at your saved location (or your time-zone centre). The converter slider drives the **sky and its digital readout only** — the circular dials always show now. Tap **Now** to snap the sky back. Stars, a flat sun-facing compass, and decorative daytime clouds are drawn on a canvas (throttled to about 1 fps when idle; respects reduced motion).
 
 ## Accuracy notes
 

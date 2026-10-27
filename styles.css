@@ -246,3 +246,11 @@ b { font-weight: 600; }
 .fmt-row { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; }
 .fmt-row .note { margin: 0; }
 .sun-note { margin-top: 8px !important; }
+
+/* Animated sky canvas behind the UI */
+#sky { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; display: block; }
+body > *:not(#sky) { position: relative; z-index: 1; }
+.card { background: rgba(12, 18, 44, .62); }
+@media (prefers-reduced-motion: reduce) {
+  #sky { /* still paints; JS skips twinkle/cloud drift */ }
+}
