@@ -21,7 +21,19 @@
   <canvas id="sky" aria-hidden="true"></canvas>
   <a class="skip" href="#explain">Skip to how it works</a>
   <header class="top">
-    <h1 class="brand"><span class="brand-mark" aria-hidden="true"></span> Ten</h1>
+    <h1 class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="-0.85 -1.15 1.7 2.3" focusable="false">
+      <defs>
+        <linearGradient id="bm-tl" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e8eaf0"/></linearGradient>
+        <linearGradient id="bm-tr" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f5f8"/><stop offset="1" stop-color="#c8ccd8"/></linearGradient>
+        <linearGradient id="bm-br" x1="1" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#8b90a0"/><stop offset="1" stop-color="#b4b8c4"/></linearGradient>
+        <linearGradient id="bm-bl" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#a8adb8"/><stop offset="1" stop-color="#d0d3dc"/></linearGradient>
+      </defs>
+      <polygon points="0,0 -0.7,0 0,-1" fill="url(#bm-tl)"/>
+      <polygon points="0,0 0,-1 0.7,0" fill="url(#bm-tr)"/>
+      <polygon points="0,0 0.7,0 0,1" fill="url(#bm-br)"/>
+      <polygon points="0,0 0,1 -0.7,0" fill="url(#bm-bl)"/>
+      <path d="M0 -1L0.7 0L0 1L-0.7 0Z" fill="none" stroke="rgba(26,16,48,.55)" stroke-width=".06"/>
+    </svg></span> Ten</h1>
     <p class="tag">Ten even hours. The new day begins at sunset.</p>
     <button type="button" id="install-btn" class="btn small install" hidden>Install app</button>
     <p class="note ios-hint" id="ios-hint" hidden>To install: tap <b>Share</b> <span aria-hidden="true">⎋</span>, then <b>Add to Home Screen</b>.</p>
