@@ -48,6 +48,17 @@
           <svg id="dial" class="dial sep-only pick-shared" viewBox="-200 -200 400 400" role="img" aria-label="Ten dial. 0 at the top is sunset and the start of the new day."></svg>
           <svg id="exact-dial" class="dial sep-only pick-exact" viewBox="-200 -200 400 400" role="img" aria-label="Meridian Ten dial for your own longitude, with your sunrise and sunset"></svg>
           <svg id="analog" class="dial sep-only pick-regular" viewBox="-100 -100 200 200" role="img" aria-label="Regular clock, one turn per day: 12 PM at the top, 12 AM at the bottom, AM on the left, PM on the right"></svg>
+          <div class="master" aria-label="Time slider">
+            <div class="master-head">
+              <span class="master-label">Time slider</span>
+              <span class="master-time" id="master-big"></span>
+              <button type="button" class="btn ghost small" id="master-now" aria-pressed="true" title="Back to now">Now</button>
+            </div>
+            <div class="master-track-wrap">
+              <div class="bar master-bar" id="master-bar"></div>
+              <input type="range" id="master-range" class="master-range" min="0" max="2879" step="5" value="0" aria-label="Time slider, 48 hours from local midnight">
+            </div>
+          </div>
           <figcaption class="legend one-only" role="group" aria-label="Rings shown">
             <button type="button" class="ring-sw" data-ring="shared" aria-pressed="true"><i class="chip shared"></i>Ten (Shared)</button>
             <button type="button" class="ring-sw" data-ring="exact" aria-pressed="true"><i class="chip exact"></i>Meridian</button>
@@ -82,24 +93,6 @@
             </div>
           </div>
         </div>
-      </div>
-      <div class="master" aria-label="Master time preview">
-        <div class="master-head">
-          <span class="eyebrow">Master time</span>
-          <div class="seg" role="group" aria-label="Preview range">
-            <button type="button" data-mrange="24" aria-pressed="true">24h</button>
-            <button type="button" data-mrange="48" aria-pressed="false">48h</button>
-          </div>
-          <button type="button" class="btn ghost small" id="master-now" aria-pressed="true">Now</button>
-        </div>
-        <p class="master-big" id="master-big" aria-hidden="true">—</p>
-        <p class="note" id="master-sub"></p>
-        <div class="master-track-wrap">
-          <div class="bar master-bar" id="master-bar"></div>
-          <input type="range" id="master-range" class="master-range" min="0" max="1439" step="5" value="0" aria-label="Preview time of day">
-        </div>
-        <p class="note" id="master-noon"></p>
-        <p class="note master-hint">Scrubs the dials, readouts, sky and converter together. Starts at local midnight. Tap Now to return to live time.</p>
       </div>
     </section>
 
