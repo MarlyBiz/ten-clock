@@ -17,6 +17,7 @@ A perfectly even **10-hour clock** where the **new day begins at sunset**. It's 
 
 | File | Purpose |
 |---|---|
+| `skycal.js` | Sky & Time Calendar: DST dates, moon phases/names, meteor peaks, local eclipses, seasons, perihelion/aphelion (on-device) |
 | `index.html` | Page markup (Shared hero, Standard, Exact, Star clock, explainer) |
 | `styles.css` | Night-sky theme, responsive from 360px up |
 | `app.js` | Builds the SVG dials and runs the `requestAnimationFrame` loop, location UI and sky gradient |

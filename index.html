@@ -35,8 +35,12 @@
       <path d="M0 -1L0.7 0L0 1L-0.7 0Z" fill="none" stroke="rgba(26,16,48,.55)" stroke-width=".06"/>
     </svg></span> Ten</h1>
     <p class="tag">Ten even hours. The new day begins at sunset.</p>
-    <button type="button" id="install-btn" class="btn small install" hidden>Install app</button>
-    <p class="note ios-hint" id="ios-hint" hidden>To install: tap <b>Share</b> <span aria-hidden="true">⎋</span>, then <b>Add to Home Screen</b>.</p>
+    <div class="top-actions">
+      <button type="button" id="share-btn" class="btn ghost small icon-btn" aria-label="Share Ten" title="Share"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <button type="button" id="install-btn" class="btn small install" hidden>Install</button>
+    </div>
+    <p class="note ios-hint" id="ios-hint" hidden></p>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   </header>
 
   <main>
@@ -160,9 +164,10 @@
 
     <!-- Sun calendar (on-device, for saved / zone location) -->
     <section class="card sun-cal" aria-labelledby="sun-cal-title">
-      <h2 id="sun-cal-title" class="eyebrow">Sun Calendar</h2>
+      <h2 id="sun-cal-title" class="eyebrow">Sky &amp; Time Calendar</h2>
       <p class="note" id="sc-note"></p>
       <ul class="sc-list" id="sc-list"></ul>
+      <p class="note sc-foot">Computed on this device. Eclipse predictions by Fred Espenak, NASA GSFC.</p>
     </section>
 
     <section class="card explain" id="explain" aria-labelledby="explain-title">

@@ -191,7 +191,7 @@ b { font-weight: 600; }
 .bars { gap: 34px; }
 
 /* Install */
-.install { margin-left: auto; }
+.top-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; align-self: center; }
 .ios-hint { flex-basis: 100%; margin: 4px 0 0; }
 
 /* One dial / Separate */
@@ -330,9 +330,15 @@ body.previewing .master-time { color: #ffd27a; }
 .card.slide { display: none !important; }
 
 /* Sun Calendar */
-.sc-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
-.sc-row { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 8px 10px;
+/* Fixed-height scroller (~5½ rows) so the page doesn't grow */
+.sc-list { list-style: none; margin: 8px 0 0; padding: 0 2px 0 0; display: grid; gap: 6px;
+  max-height: 318px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.25) transparent;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 18px), transparent); mask-image: linear-gradient(#000 calc(100% - 18px), transparent); }
+.sc-row { display: grid; grid-template-columns: 26px 1fr auto; gap: 0 8px; padding: 7px 10px; align-items: center;
   border: 1px solid var(--line); border-radius: 10px; background: rgba(8,12,28,.35); }
+.sc-ic { grid-row: 1 / span 2; font-size: 1.15rem; line-height: 1; text-align: center; }
+.sc-row .sc-v { grid-column: 2 / -1; font-size: .86rem; }
 .sc-row.next { border-color: rgba(255,184,107,.55); box-shadow: 0 0 0 1px rgba(255,184,107,.15); }
 .sc-k { font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent2); }
 .sc-hint { font-size: .78rem; color: #ffd27a; font-weight: 600; text-align: right; }
@@ -404,3 +410,19 @@ body.previewing .master-time { color: #ffd27a; }
   align-self: center;
 }
 .ampm-chip[aria-pressed="false"] { background: rgba(255,255,255,.12); color: var(--mute); }
+
+/* Hands are placed every frame from one clock — never tween (no snap/reverse at 59→0) */
+.hand, .c-hand, .sec-track * { transition: none !important; animation: none !important; }
+.sc-row .sc-k { text-transform: none; letter-spacing: .01em; font-size: .84rem; }
+
+/* Header actions: discreet Share + Install */
+.icon-btn { width: 32px; min-width: 32px; padding: 0 !important; display: inline-grid; place-items: center; }
+.icon-btn svg { width: 17px; height: 17px; }
+.top .btn.small { min-height: 30px; }
+.ios-share { width: 1em; height: 1em; vertical-align: -0.15em; }
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 20;
+  background: rgba(12,18,44,.92); color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 8px 16px;
+  font-size: .88rem; box-shadow: 0 6px 20px rgba(0,0,0,.35); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.toast[hidden] { display: none; }
+.top .icon-btn { background: rgba(12,18,44,.35); }
+.sc-foot { font-size: .74rem; margin-top: 6px !important; opacity: .8; }

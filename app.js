@@ -1,5 +1,6 @@
 // app.js — UI for Ten. All math lives in time.js.
 import * as T from './time.js';
+import * as SC from './skycal.js';
 
 const $ = (id) => document.getElementById(id);
 const NS = 'http://www.w3.org/2000/svg';
@@ -286,8 +287,19 @@ const setHtml = (id, html) => {
 };
 let lastLive = '', lastSecond = -1;
 
+/* One smooth clock: performance.now() (monotonic, sub-ms) anchored to Date.now().
+   Re-anchors if the system clock steps (>120 ms) or the tab becomes visible again. */
+const CLOCK = { perf0: performance.now(), wall0: Date.now() };
+const reanchorClock = () => { CLOCK.perf0 = performance.now(); CLOCK.wall0 = Date.now(); };
+const wallMs = () => {
+  const t = CLOCK.wall0 + (performance.now() - CLOCK.perf0);
+  if (Math.abs(t - Date.now()) > 120) { reanchorClock(); return CLOCK.wall0; }
+  return t;
+};
+const wallNow = () => new Date(wallMs());
+
 function frame() {
-  const wall = new Date();
+  const wall = wallNow();
   const now = masterClock(wall); // live wall time, or master preview instant
   const smooth = !reduceMotion.matches;
 
@@ -307,11 +319,20 @@ function frame() {
 
   // Readouts: every Ten-second live; every SI second in preview (single previewTs drives both)
   const gate = MASTER.live ? Math.floor(sh) : (Math.floor(sh) * 100 + now.getSeconds());
-  if (gate !== lastSecond) { lastSecond = gate; slowUpdate(now, sh); }
-  // Keep thumb + label in sync while live, or while preview is free-running
-  if (MASTER.live || (!MASTER.dragging && !MASTER.frozen)) masterTick(wall);
+  if (gate !== lastSecond) {
+    lastSecond = gate;
+    // Heavy DOM/canvas work once per tick, after the hands are placed for this frame
+    slowUpdate(now, sh);
+    if (MASTER.live || (!MASTER.dragging && !MASTER.frozen)) masterTick(wall);
+  }
   requestAnimationFrame(frame);
 }
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  reanchorClock();
+  lastSecond = -1; sunKey = ''; lastSky = 0; masterBarKey = '';
+});
+addEventListener('pageshow', () => { reanchorClock(); lastSecond = -1; });
 
 function slowUpdate(now, sh) {
   const shStr = T.formatTen(sh);
@@ -319,6 +340,7 @@ function slowUpdate(now, sh) {
   const td = T.sharedTenDate(now);
   updateSun(now, td);
   sliderTick(now);
+  renderSunCal(wallNow()); // cached per day/place; real time, not the preview
   // sky canvas follows SL.instant via sliderTick, not the dials
 
   // the three readings
@@ -507,6 +529,7 @@ const reduceSky = matchMedia('(prefers-reduced-motion: reduce)');
 const stars = Array.from({ length: 80 }, () => ({ x: Math.random(), y: Math.random() * 0.55, r: Math.random() * 1.2 + 0.3, p: Math.random() * Math.PI * 2 }));
 const clouds = Array.from({ length: 5 }, (_, i) => ({ x: Math.random(), y: 0.12 + i * 0.06, s: 0.35 + Math.random() * 0.4, v: 0.003 + Math.random() * 0.004 }));
 let skyW = 0, skyH = 0, lastSky = 0, skySliding = false;
+const MASTER_LIVE_SKY_MS = 10000;
 const skyPlace = (d) => {
   const p = sunPlace(d);
   return T.skyScene(d, p.lat, p.lon);
@@ -682,7 +705,9 @@ function drawSun(ctx, x, y, R, alt) {
 }
 function paintSky(date, force = false) {
   const now = performance.now();
-  if (!force && !skySliding && now - lastSky < 1000) return;
+  // Live sky changes imperceptibly per second; a full-canvas repaint is the heaviest work on the
+  // main thread, so repaint it every 10 s when idle (sliding/forced paints stay immediate).
+  if (!force && !skySliding && now - lastSky < (MASTER_LIVE_SKY_MS)) return;
   lastSky = now;
   if (!skyW) resizeSky();
   const sc = skyPlace(date);
@@ -923,20 +948,47 @@ const installBtn = $('install-btn'), iosHint = $('ios-hint');
 const standaloneMQ = matchMedia('(display-mode: standalone)');
 const isStandalone = () => standaloneMQ.matches || navigator.standalone === true;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+// Desktop Safari (macOS Sonoma+) installs via File → Add to Dock; no beforeinstallprompt there
+const isMacSafari = !isIOS && /Macintosh/.test(navigator.userAgent) && /Safari\//.test(navigator.userAgent)
+  && !/Chrome|Chromium|CriOS|Edg|OPR|Firefox|FxiOS/.test(navigator.userAgent);
 let installEvt = null;
 function refreshInstall() {
-  const show = !isStandalone() && (installEvt || isIOS);
+  const show = !isStandalone() && (installEvt || isIOS || isMacSafari);
   installBtn.hidden = !show;
   if (!show) iosHint.hidden = true;
 }
+iosHint.innerHTML = isMacSafari
+  ? 'To install: in Safari choose <b>File</b> → <b>Add to Dock</b> (or <b>Share</b> → <b>Add to Dock</b>).'
+  : 'To install: tap <b>Share</b> <svg class="ios-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>, then <b>Add to Home Screen</b>.';
 addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); installEvt = e; refreshInstall(); });
 addEventListener('appinstalled', () => { installEvt = null; refreshInstall(); });
 standaloneMQ.addEventListener?.('change', refreshInstall);
 installBtn.addEventListener('click', async () => {
   if (installEvt) { installEvt.prompt(); try { await installEvt.userChoice; } catch { /* ignore */ } installEvt = null; refreshInstall(); }
-  else if (isIOS) iosHint.hidden = !iosHint.hidden;
+  else if (isIOS || isMacSafari) iosHint.hidden = !iosHint.hidden;
 });
 refreshInstall();
+
+/* ---------- Share ---------- */
+const SHARE = { title: 'Ten — the 10-hour sunset clock', text: 'Ten: a perfectly even 10-hour clock where the new day begins at sunset.', url: 'https://ten.marlylabs.app' };
+let toastTimer = 0;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+$('share-btn').addEventListener('click', async () => {
+  if (navigator.share) {
+    try { await navigator.share(SHARE); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  try { await navigator.clipboard.writeText(SHARE.url); toast('Link copied'); }
+  catch {
+    const ta = Object.assign(document.createElement('textarea'), { value: SHARE.url });
+    ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand('copy'); } catch { /* ignore */ }
+    ta.remove(); toast(ok ? 'Link copied' : SHARE.url);
+  }
+});
 
 
 /* ---------- Master time slider (scrubs dials + sky + converter together) ---------- */
@@ -960,13 +1012,13 @@ const localMidnight = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()
  * One preview clock for everything (hands, seconds tracks, readouts, sky).
  * Live → wall. Dragging/frozen → exact previewTs. Held still → previewTs advances with real elapsed time.
  */
-const masterClock = (wall = new Date()) => {
+const masterClock = (wall = wallNow()) => {
   if (MASTER.live) return wall;
   if (MASTER.dragging || MASTER.frozen) return new Date(MASTER.previewTs);
   return new Date(MASTER.previewTs + (wall.getTime() - MASTER.anchorWall));
 };
 
-function masterStamp(ts, wall = new Date()) {
+function masterStamp(ts, wall = wallNow()) {
   MASTER.previewTs = ts;
   MASTER.anchorWall = wall.getTime();
 }
@@ -974,7 +1026,7 @@ function masterStamp(ts, wall = new Date()) {
 function masterStart(wall = new Date()) {
   return localMidnight(wall); // range starts at local midnight today
 }
-function masterSyncRange(wall = new Date()) {
+function masterSyncRange(wall = wallNow()) {
   const start = masterStart(wall);
   masterRange.min = '0';
   masterRange.max = String(MASTER_SPAN_S - 1);
@@ -984,10 +1036,14 @@ function masterSyncRange(wall = new Date()) {
   if (!MASTER.dragging) masterRange.value = String(sec);
   paintMasterBar(wall);
 }
-function paintMasterBar(wall = new Date()) {
+let masterBarKey = '';
+function paintMasterBar(wall = wallNow()) {
   const start = masterStart(wall);
-  masterBar.replaceChildren();
   const p = sunPlace(wall);
+  const key = `${start.getTime()}|${p.lat}|${p.lon}`;
+  if (key === masterBarKey && masterBar.childElementCount) return;
+  masterBarKey = key;
+  masterBar.replaceChildren();
   for (let day = 0; day < 2; day++) { // always two local days
     const d0 = new Date(start.getFullYear(), start.getMonth(), start.getDate() + day);
     const st = T.sunTimes(d0.getFullYear(), d0.getMonth() + 1, d0.getDate(), p.lat, p.lon);
@@ -1007,7 +1063,7 @@ function paintMasterBar(wall = new Date()) {
   }
 }
 function masterEnterPreview(ts, { drag = false, freeze = false } = {}) {
-  const wall = new Date();
+  const wall = wallNow();
   MASTER.live = false;
   MASTER.dragging = drag;
   MASTER.frozen = freeze;
@@ -1036,7 +1092,7 @@ function masterTick(wall) {
 function masterEndDrag() {
   if (!MASTER.dragging) return;
   // Lock current preview time, then let it run forward with wall clock
-  const wall = new Date();
+  const wall = wallNow();
   const now = masterClock(wall);
   MASTER.dragging = false;
   MASTER.frozen = false;
@@ -1064,7 +1120,8 @@ masterRange.addEventListener('input', () => {
 $('master-now').addEventListener('click', () => {
   MASTER.live = true; MASTER.dragging = false; MASTER.frozen = false;
   SL.live = true; skySliding = false;
-  const wall = new Date();
+  reanchorClock();
+  const wall = wallNow();
   masterStamp(wall.getTime(), wall);
   SL.instant = wall;
   masterSyncRange(wall); masterRender(); syncRange(); sliderRender(); paintSky(wall, true);
@@ -1244,76 +1301,64 @@ const scLen = (h) => {
 /** Format a sunrise/sunset Date in the device zone — DST follows that event's own date. */
 const scHM = (d) => (d ? (hourFmt === '24' ? t24.format(d) : fmt12Html(d, false)) : '—');
 let scKey = '';
+const scDay = (ms, y0) => { const d = new Date(ms); return `${SC_MONTHS[d.getMonth()]} ${d.getDate()}${d.getFullYear() !== y0 ? `, ${d.getFullYear()}` : ''}`; };
+const scWall = (d) => { // a Date whose UTC fields hold a local wall-clock time
+  const h = d.getUTCHours(), m = pad(d.getUTCMinutes());
+  return hourFmt === '24' ? `${pad(h)}:${m}` : `${h % 12 || 12}:${m}${ampmSfx(h < 12 ? 'AM' : 'PM')}`;
+};
+const scIn = (n) => (n === 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`);
+const scMoon = (f) => { const p = Math.round(f * 100); return `Moon ${p}%${p < 25 ? ' · dark skies' : p > 70 ? ' · bright moon' : ''}`; };
+function scDetail(e, y0) {
+  const date = `<b>${scDay(e.ms, y0)}</b>`;
+  const time = e.dateOnly ? '' : ` · ${scHM(new Date(e.ms))}`;
+  switch (e.kind) {
+    case 'dstStart': case 'dstEnd':
+      return `${date} · ${scWall(e.wallBefore)} · clocks ${e.kind === 'dstStart' ? 'forward' : 'back'} ${Math.abs(e.shiftMin) === 60 ? '1h' : `${Math.abs(e.shiftMin)}m`}`;
+    case 'solstice':
+      return `${date}${time}${e.dayLen != null ? ` · ${e.longest ? 'longest' : 'shortest'} day ${scLen(e.dayLen)}` : ''}`;
+    case 'equal':
+      return `${date} · ${scHM(e.rise)} – ${scHM(e.set)} · ${scLen(e.dayLen)}`;
+    case 'eotZero':
+      return `${date} · sundial matches Meridian time`;
+    case 'perihelion': case 'aphelion':
+      return `${date} · ${e.au.toFixed(4)} AU`;
+    case 'full':
+      return `${date}${time}${e.superMoon ? ' · supermoon' : ''}`;
+    case 'meteor':
+      return `${date} night · up to ${e.zhr}/h · ${scMoon(e.moon)}${e.note ? ` · ${e.note}` : ''}`;
+    case 'solarEclipse':
+      return `${date}${time} · max here · eclipse glasses only`;
+    case 'lunarEclipse':
+      return `${date}${time} · greatest eclipse`;
+    default:
+      return `${date}${time}`;
+  }
+}
 function renderSunCal(now = new Date()) {
   const list = $('sc-list'), note = $('sc-note');
   if (!list || !note) return;
   const p = sunPlace(now);
-  const y = now.getFullYear();
-  const key = `${y}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}|${hourFmt}`;
+  const key = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours() >> 3}|${p.lat.toFixed(3)}|${p.lon.toFixed(3)}|${hourFmt}`;
   if (key === scKey && list.childElementCount) return;
   scKey = key;
-  const cal = T.sunCalendar(y, p.lat, p.lon, now);
+  const cal = T.sunCalendar(now.getFullYear(), p.lat, p.lon, now);
+  const { events, next } = SC.skyEvents(now, p.lat, p.lon);
   const bits = [];
   if (cal.notes.polar) bits.push(cal.notes.polar);
   if (cal.notes.equator) bits.push(cal.notes.equator);
   if (!loc) bits.push('Using your time-zone centre — set a location for your place.');
   note.textContent = bits.join(' ');
-
-  const rows = [];
-  const isNext = (e) => cal.next && e && cal.next.kind === e.kind && cal.next.m === e.m && cal.next.d === e.d
-    || (cal.next && e && e.kind === 'equal' && cal.next.kind === 'equal' && cal.next.m === e.m && cal.next.d === e.d);
-  const hintFor = (e) => {
-    if (!cal.next || !e) return '';
-    const match = cal.next.kind === e.kind && cal.next.m === e.m && cal.next.d === e.d;
-    if (!match) return '';
-    const n = cal.next.inDays;
-    return n === 0 ? 'today' : n === 1 ? 'in 1 day' : `in ${n} days`;
-  };
-
-  if (cal.equal?.length && !cal.notes.equator) {
-    const lines = cal.equal.map((e) => {
-      const h = hintFor(e);
-      return { next: !!h, hint: h, k: 'Equal day / night',
-        v: `<b>${scDate(e)}</b> · ${scHM(e.rise)} – ${scHM(e.set)} · ${scLen(e.len)}` };
-    });
-    rows.push(...lines);
-  } else if (cal.notes.equator) {
-    rows.push({ next: false, hint: '', k: 'equal day / night', v: cal.notes.equator });
-  }
-
-  if (cal.eotZero?.length) {
-    const dates = cal.eotZero.map(scDate).join(' · ');
-    const nextE = cal.eotZero.find((e) => hintFor(e));
-    const h = nextE ? hintFor(nextE) : '';
-    const max = cal.eotMax, min = cal.eotMin;
-    const drift = (max && min)
-      ? `Max drift +${Math.round(max.eot)} min (${scDate(max)}) · ${Math.round(min.eot)} min (${scDate(min)})`
-      : '';
-    rows.push({ next: !!h, hint: h, k: 'sun on Meridian noon',
-      v: `<b>${dates}</b>${drift ? `<br>${drift}` : ''}` });
-  }
-
-  if (cal.longest && cal.shortest && !cal.notes.polar) {
-    for (const [e, label] of [[cal.longest, 'longest day'], [cal.shortest, 'shortest day']]) {
-      const h = hintFor(e);
-      rows.push({ next: !!h, hint: h, k: label,
-        v: `<b>${scDate(e)}</b> · ${scLen(e.len)} · ${scHM(e.rise)} – ${scHM(e.set)}` });
-    }
-  } else if (cal.notes.polar) {
-    rows.push({ next: false, hint: '', k: 'solstices', v: cal.notes.polar });
-  }
-
-  // Mark next across kinds: if next is eotZero, the combined row already has hint;
-  // also bump equal/longest/shortest individually.
+  const y0 = now.getFullYear();
   list.replaceChildren();
-  for (const r of rows) {
+  for (const e of events) {
     const li = document.createElement('li');
-    li.className = 'sc-row' + (r.next ? ' next' : '');
-    li.innerHTML = `<span class="sc-k">${r.k}</span>`
-      + (r.hint ? `<span class="sc-hint">${r.hint}</span>` : `<span class="sc-hint"></span>`)
-      + `<span class="sc-v">${r.v}</span>`;
+    li.className = 'sc-row' + (e === next ? ' next' : '');
+    li.innerHTML = `<span class="sc-ic" aria-hidden="true">${e.icon}</span>`
+      + `<span class="sc-k">${e.label}</span><span class="sc-hint">${scIn(e.inDays)}</span>`
+      + `<span class="sc-v">${scDetail(e, y0)}</span>`;
     list.appendChild(li);
   }
+  list.scrollTop = 0;
 }
 
 /* ---------- location UI ---------- */

@@ -354,3 +354,34 @@ test('Ten 5:00 types to Standard 6:00 AM; Standard 9:00 AM types to Ten ~5:62', 
   const back = T.typedTimeToInstant('exact', T.parseTenTime(mer).total, s9, lon);
   assert.ok(Math.abs(back.getTime() - s9.getTime()) < 2000);
 });
+
+test('Sky calendar: Detroit daylight-saving dates (device zone)', async () => {
+  const S = await import('../skycal.js');
+  const tr = S.dstTransitions(Date.parse('2026-10-01T00:00:00Z'), Date.parse('2027-12-31T00:00:00Z'));
+  assert.deepEqual(tr.map((t) => [t.kind, new Date(t.ms).toISOString()]), [
+    ['dstEnd', '2026-11-01T06:00:00.000Z'],   // 2:00 AM EDT → 1:00 AM EST
+    ['dstStart', '2027-03-14T07:00:00.000Z'], // 2:00 AM EST → 3:00 AM EDT
+    ['dstEnd', '2027-11-07T06:00:00.000Z'],
+  ]);
+  assert.equal(tr[1].wallBefore.getUTCHours(), 2); // clocks jump at 2:00 local
+  assert.equal(tr[0].shiftMin, -60);
+});
+
+test('Sky calendar: seasons, moon phase, eclipse and meteor dates', async () => {
+  const S = await import('../skycal.js');
+  const mins = (ms, iso) => Math.abs(ms - Date.parse(iso)) / 60000;
+  const [mar] = S.seasons(2027);
+  assert.ok(mins(mar.ms, '2027-03-20T20:24:00Z') < 15, 'March 2027 equinox');
+  const full = S.moonPhases(Date.parse('2026-11-20T00:00:00Z'), Date.parse('2026-11-28T00:00:00Z')).find((p) => p.kind === 'full');
+  assert.ok(mins(full.ms, '2026-11-24T14:53:00Z') < 30, 'Nov 2026 full moon');
+  // 2029 Jan 14 partial solar eclipse is visible from Walled Lake, MI; 2027 Aug 2 (Africa/Europe) is not
+  const vis = S.solarEclipseLocal('2029-01-14T17:13:47Z', 'partial', 42.538, -83.481);
+  assert.ok(vis && vis.kind === 'partial' && vis.mag > 0.4 && vis.mag < 0.9, `2029 eclipse here: ${JSON.stringify(vis)}`);
+  assert.equal(S.solarEclipseLocal('2027-08-02T10:07:49Z', 'total', 42.538, -83.481), null);
+  // Upcoming list from Oct 29 2026: Geminids Dec 14, sorted, "in N days"
+  const { events } = S.skyEvents(new Date(2026, 9, 29, 21, 44), 42.538, -83.481);
+  const gem = events.find((e) => e.label === 'Geminids peak');
+  assert.equal(gem.inDays, 46);
+  assert.ok(events.every((e, i) => !i || events[i - 1].ms <= e.ms), 'sorted by date');
+  assert.ok(events.some((e) => e.kind === 'dstEnd' && e.inDays === 3));
+});
